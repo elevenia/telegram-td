@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -21,49 +21,8 @@ void init_crypto();
 
 int pq_factorize(Slice pq_str, string *p_str, string *q_str);
 
-class AesState {
- public:
-  AesState();
-  AesState(const AesState &from) = delete;
-  AesState &operator=(const AesState &from) = delete;
-  AesState(AesState &&from);
-  AesState &operator=(AesState &&from);
-  ~AesState();
-
-  void init(Slice key, bool encrypt);
-
-  void encrypt(const uint8 *src, uint8 *dst, int size);
-
-  void decrypt(const uint8 *src, uint8 *dst, int size);
-
- private:
-  struct Impl;
-  unique_ptr<Impl> impl_;
-};
-
 void aes_ige_encrypt(Slice aes_key, MutableSlice aes_iv, Slice from, MutableSlice to);
 void aes_ige_decrypt(Slice aes_key, MutableSlice aes_iv, Slice from, MutableSlice to);
-
-class AesIgeStateImpl;
-
-class AesIgeState {
- public:
-  AesIgeState();
-  AesIgeState(const AesIgeState &from) = delete;
-  AesIgeState &operator=(const AesIgeState &from) = delete;
-  AesIgeState(AesIgeState &&from);
-  AesIgeState &operator=(AesIgeState &&from);
-  ~AesIgeState();
-
-  void init(Slice key, Slice iv, bool encrypt);
-
-  void encrypt(Slice from, MutableSlice to);
-
-  void decrypt(Slice from, MutableSlice to);
-
- private:
-  unique_ptr<AesIgeStateImpl> impl_;
-};
 
 void aes_cbc_encrypt(Slice aes_key, MutableSlice aes_iv, Slice from, MutableSlice to);
 void aes_cbc_decrypt(Slice aes_key, MutableSlice aes_iv, Slice from, MutableSlice to);
@@ -84,36 +43,20 @@ class AesCtrState {
   void decrypt(Slice from, MutableSlice to);
 
  private:
-  struct Impl;
+  class Impl;
   unique_ptr<Impl> ctx_;
 };
 
 class AesCbcState {
  public:
   AesCbcState(Slice key256, Slice iv128);
-  AesCbcState(const AesCbcState &from) = delete;
-  AesCbcState &operator=(const AesCbcState &from) = delete;
-  AesCbcState(AesCbcState &&from);
-  AesCbcState &operator=(AesCbcState &&from);
-  ~AesCbcState();
 
   void encrypt(Slice from, MutableSlice to);
   void decrypt(Slice from, MutableSlice to);
 
-  struct Raw {
-    SecureString key;
-    SecureString iv;
-  };
-  const Raw &raw() const {
-    return raw_;
-  }
-
  private:
-  struct Impl;
-  unique_ptr<Impl> ctx_;
-
-  Raw raw_;
-  bool is_encrypt_ = false;
+  SecureString key_;
+  SecureString iv_;
 };
 
 void sha1(Slice data, unsigned char output[20]);
@@ -160,10 +103,6 @@ Result<BufferSlice> rsa_encrypt_pkcs1_oaep(Slice public_key, Slice data);
 Result<BufferSlice> rsa_decrypt_pkcs1_oaep(Slice private_key, Slice data);
 
 void init_openssl_threads();
-
-Status create_openssl_error(int code, Slice message);
-
-void clear_openssl_errors(Slice source);
 #endif
 
 #if TD_HAVE_ZLIB

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -88,9 +88,7 @@ BigNum BigNum::from_binary(Slice str) {
 }
 
 BigNum BigNum::from_le_binary(Slice str) {
-#if defined(OPENSSL_IS_BORINGSSL)
-  return BigNum(make_unique<Impl>(BN_le2bn(str.ubegin(), narrow_cast<int>(str.size()), nullptr)));
-#elif OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
   return BigNum(make_unique<Impl>(BN_lebin2bn(str.ubegin(), narrow_cast<int>(str.size()), nullptr)));
 #else
   string str_copy = str.str();
@@ -124,6 +122,10 @@ BigNum BigNum::from_raw(void *openssl_big_num) {
 BigNum::BigNum(unique_ptr<Impl> &&impl) : impl_(std::move(impl)) {
 }
 
+void BigNum::ensure_const_time() {
+  BN_set_flags(impl_->big_num, BN_FLG_CONSTTIME);
+}
+
 int BigNum::get_num_bits() const {
   return BN_num_bits(impl_->big_num);
 }
@@ -147,12 +149,7 @@ bool BigNum::is_bit_set(int num) const {
 }
 
 bool BigNum::is_prime(BigNumContext &context) const {
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && !defined(LIBRESSL_VERSION_NUMBER)
-  int result = BN_check_prime(impl_->big_num, context.impl_->big_num_context, nullptr);
-#else
-  int result =
-      BN_is_prime_ex(impl_->big_num, get_num_bits() > 2048 ? 128 : 64, context.impl_->big_num_context, nullptr);
-#endif
+  int result = BN_is_prime_ex(impl_->big_num, BN_prime_checks, context.impl_->big_num_context, nullptr);
   LOG_IF(FATAL, result == -1);
   return result == 1;
 }
@@ -211,20 +208,16 @@ string BigNum::to_binary(int exact_size) const {
 }
 
 string BigNum::to_le_binary(int exact_size) const {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER) || defined(OPENSSL_IS_BORINGSSL)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
   int num_size = get_num_bytes();
   if (exact_size == -1) {
     exact_size = num_size;
   } else {
     CHECK(exact_size >= num_size);
   }
-  string result(exact_size, '\0');
-#if defined(OPENSSL_IS_BORINGSSL)
-  BN_bn2le_padded(MutableSlice(result).ubegin(), exact_size, impl_->big_num);
-#else
-  BN_bn2lebinpad(impl_->big_num, MutableSlice(result).ubegin(), exact_size);
-#endif
-  return result;
+  string res(exact_size, '\0');
+  BN_bn2lebinpad(impl_->big_num, MutableSlice(res).ubegin(), exact_size);
+  return res;
 #else
   string result = to_binary(exact_size);
   std::reverse(result.begin(), result.end());

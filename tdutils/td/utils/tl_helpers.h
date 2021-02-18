@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -21,26 +21,26 @@
 #include <unordered_set>
 #include <utility>
 
-#define BEGIN_STORE_FLAGS()       \
-  do {                            \
-    ::td::uint32 flags_store = 0; \
-  ::td::uint32 bit_offset_store = 0
+#define BEGIN_STORE_FLAGS() \
+  do {                      \
+    uint32 flags_store = 0; \
+  uint32 bit_offset_store = 0
 
 #define STORE_FLAG(flag)                     \
   flags_store |= (flag) << bit_offset_store; \
   bit_offset_store++
 
-#define END_STORE_FLAGS()           \
-  CHECK(bit_offset_store < 31);     \
-  ::td::store(flags_store, storer); \
-  }                                 \
+#define END_STORE_FLAGS()         \
+  CHECK(bit_offset_store < 31);   \
+  td::store(flags_store, storer); \
+  }                               \
   while (false)
 
-#define BEGIN_PARSE_FLAGS()            \
-  do {                                 \
-    ::td::uint32 flags_parse;          \
-    ::td::uint32 bit_offset_parse = 0; \
-  ::td::parse(flags_parse, parser)
+#define BEGIN_PARSE_FLAGS()      \
+  do {                           \
+    uint32 flags_parse;          \
+    uint32 bit_offset_parse = 0; \
+  td::parse(flags_parse, parser)
 
 #define PARSE_FLAG(flag)                               \
   flag = ((flags_parse >> bit_offset_parse) & 1) != 0; \
@@ -136,13 +136,6 @@ void store(const vector<T> &vec, StorerT &storer) {
   storer.store_binary(narrow_cast<int32>(vec.size()));
   for (auto &val : vec) {
     store(val, storer);
-  }
-}
-template <class T, class StorerT>
-void store(const vector<T *> &vec, StorerT &storer) {
-  storer.store_binary(narrow_cast<int32>(vec.size()));
-  for (auto &val : vec) {
-    store(*val, storer);
   }
 }
 template <class T, class ParserT>

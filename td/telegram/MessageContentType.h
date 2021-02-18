@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,8 +8,6 @@
 
 #include "td/utils/common.h"
 #include "td/utils/StringBuilder.h"
-
-#include <functional>
 
 namespace td {
 
@@ -55,29 +53,17 @@ enum class MessageContentType : int32 {
   WebsiteConnected,
   PassportDataSent,
   PassportDataReceived,
-  Poll,
-  Dice,
-  ProximityAlertTriggered,
-  GroupCall,
-  InviteToGroupCall
+  Poll
 };
 
 StringBuilder &operator<<(StringBuilder &string_builder, MessageContentType content_type);
 
 bool is_allowed_media_group_content(MessageContentType content_type);
 
-bool is_homogenous_media_group_content(MessageContentType content_type);
-
 bool is_secret_message_content(int32 ttl, MessageContentType content_type);
 
 bool is_service_message_content(MessageContentType content_type);
 
 bool can_have_message_content_caption(MessageContentType content_type);
-
-struct MessageContentTypeHash {
-  std::size_t operator()(MessageContentType content_type) const {
-    return std::hash<int32>()(static_cast<int32>(content_type));
-  }
-};
 
 }  // namespace td

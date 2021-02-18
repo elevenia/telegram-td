@@ -1,12 +1,11 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 #include "td/telegram/SetWithPosition.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/common.h"
 #include "td/utils/misc.h"
 #include "td/utils/Random.h"
@@ -230,7 +229,7 @@ template <template <class> class RawSet>
 static void test_speed() {
   Random::Xorshift128plus rnd(123);
   using Set = CheckedSetWithPosition<int, RawSet>;
-  const size_t total_size = 1 << 13;
+  constexpr size_t total_size = 1 << 13;
   std::vector<unique_ptr<Set>> sets(total_size);
   for (size_t i = 0; i < sets.size(); i++) {
     sets[i] = make_unique<Set>();

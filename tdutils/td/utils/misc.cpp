@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -27,31 +27,20 @@ char *str_dup(Slice str) {
 
 string implode(const vector<string> &v, char delimiter) {
   string result;
-  for (size_t i = 0; i < v.size(); i++) {
-    if (i != 0) {
+  for (auto &str : v) {
+    if (!result.empty()) {
       result += delimiter;
     }
-    result += v[i];
+    result += str;
   }
   return result;
 }
 
-string lpad(string str, size_t size, char c) {
-  if (str.size() >= size) {
-    return str;
-  }
-  return string(size - str.size(), c) + str;
-}
-
 string lpad0(string str, size_t size) {
-  return lpad(std::move(str), size, '0');
-}
-
-string rpad(string str, size_t size, char c) {
   if (str.size() >= size) {
     return str;
   }
-  return str + string(size - str.size(), c);
+  return string(size - str.size(), '0') + str;
 }
 
 string oneline(Slice str) {
@@ -59,7 +48,7 @@ string oneline(Slice str) {
   result.reserve(str.size());
   bool after_new_line = true;
   for (auto c : str) {
-    if (c != '\n' && c != '\r') {
+    if (c != '\n') {
       if (after_new_line) {
         if (c == ' ') {
           continue;
@@ -67,7 +56,7 @@ string oneline(Slice str) {
         after_new_line = false;
       }
       result += c;
-    } else if (!after_new_line) {
+    } else {
       after_new_line = true;
       result += ' ';
     }
@@ -146,30 +135,6 @@ string url_encode(Slice data) {
   }
   CHECK(result.size() == length);
   return result;
-}
-
-size_t url_decode(Slice from, MutableSlice to, bool decode_plus_sign_as_space) {
-  size_t to_i = 0;
-  CHECK(to.size() >= from.size());
-  for (size_t from_i = 0, n = from.size(); from_i < n; from_i++) {
-    if (from[from_i] == '%' && from_i + 2 < n) {
-      int high = hex_to_int(from[from_i + 1]);
-      int low = hex_to_int(from[from_i + 2]);
-      if (high < 16 && low < 16) {
-        to[to_i++] = static_cast<char>(high * 16 + low);
-        from_i += 2;
-        continue;
-      }
-    }
-    to[to_i++] = decode_plus_sign_as_space && from[from_i] == '+' ? ' ' : from[from_i];
-  }
-  return to_i;
-}
-
-MutableSlice url_decode_inplace(MutableSlice str, bool decode_plus_sign_as_space) {
-  size_t result_size = url_decode(str, str, decode_plus_sign_as_space);
-  str.truncate(result_size);
-  return str;
 }
 
 string buffer_to_hex(Slice buffer) {

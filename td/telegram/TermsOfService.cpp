@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -27,7 +27,7 @@ class GetTermsOfServiceUpdateQuery : public Td::ResultHandler {
 
   void send() {
     // we don't poll terms of service before authorization
-    send_query(G()->net_query_creator().create(telegram_api::help_getTermsOfServiceUpdate()));
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::help_getTermsOfServiceUpdate())));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -66,8 +66,8 @@ class AcceptTermsOfServiceQuery : public Td::ResultHandler {
   }
 
   void send(string terms_of_service_id) {
-    send_query(G()->net_query_creator().create(telegram_api::help_acceptTermsOfService(
-        telegram_api::make_object<telegram_api::dataJSON>(std::move(terms_of_service_id)))));
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::help_acceptTermsOfService(
+        telegram_api::make_object<telegram_api::dataJSON>(std::move(terms_of_service_id))))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -100,7 +100,7 @@ TermsOfService::TermsOfService(telegram_api::object_ptr<telegram_api::help_terms
     if (!clean_input_string(terms->text_)) {
       terms->text_.clear();
     }
-    entities = find_entities(terms->text_, true);
+    entities.clear();
   }
   if (terms->text_.empty()) {
     id_.clear();

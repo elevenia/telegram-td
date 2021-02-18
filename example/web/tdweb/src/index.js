@@ -169,7 +169,7 @@ class TdClient {
       'receive from worker: ',
       JSON.parse(
         JSON.stringify(response, (key, value) => {
-          if (key === 'arr' || key === 'data') {
+          if (key === 'arr') {
             return undefined;
           }
           return value;
@@ -233,12 +233,7 @@ class TdClient {
     }
     for (const key in response) {
       const field = response[key];
-      if (
-        field &&
-        typeof field === 'object' &&
-        key !== 'data' &&
-        key !== 'arr'
-      ) {
+      if (field && typeof field === 'object') {
         response[key] = this.prepareResponse(field);
       }
     }
@@ -584,7 +579,7 @@ class FileManager {
           file_id: info.file.id,
           offset: offset
         });
-        //log.error(count, size);
+        log.error(count, size);
         if (!size) {
           size = count.count;
         } else if (size > count.count) {
@@ -594,11 +589,11 @@ class FileManager {
           '@type': 'readFilePart',
           path: info.file.local.path,
           offset: offset,
-          count: size
+          size: size
         });
         res.data = new Blob([res.data]);
         res.transaction_id = -2;
-        //log.error(res);
+        log.error(res);
         return res;
       } catch (e) {
         log.info('readFilePart failed', info, offset, size, e);
@@ -637,7 +632,7 @@ class FileManager {
         this.lru.onUsed(info.node);
       }
       query.offset = query.offset || 0;
-      query.size = query.count || query.size || 0;
+      query.size = query.size || 0;
       const response = await this.doLoad(info, query.offset, query.size);
       return {
         '@type': 'filePart',

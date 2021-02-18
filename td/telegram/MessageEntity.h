@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -28,7 +28,6 @@ class ContactsManager;
 
 class MessageEntity {
  public:
-  // don't forget to update get_type_priority()
   enum class Type : int32 {
     Mention,
     Hashtag,
@@ -46,9 +45,7 @@ class MessageEntity {
     PhoneNumber,
     Underline,
     Strikethrough,
-    BlockQuote,
-    BankCardNumber,
-    Size
+    BlockQuote
   };
   Type type;
   int32 offset;
@@ -115,8 +112,6 @@ struct FormattedText {
   void parse(ParserT &parser);
 };
 
-StringBuilder &operator<<(StringBuilder &string_builder, const FormattedText &text);
-
 inline bool operator==(const FormattedText &lhs, const FormattedText &rhs) {
   return lhs.text == rhs.text && lhs.entities == rhs.entities;
 }
@@ -128,8 +123,7 @@ inline bool operator!=(const FormattedText &lhs, const FormattedText &rhs) {
 const std::unordered_set<Slice, SliceHash> &get_valid_short_usernames();
 
 Result<vector<MessageEntity>> get_message_entities(const ContactsManager *contacts_manager,
-                                                   vector<tl_object_ptr<td_api::textEntity>> &&input_entities,
-                                                   bool allow_all = false);
+                                                   vector<tl_object_ptr<td_api::textEntity>> &&input_entities);
 
 vector<tl_object_ptr<td_api::textEntity>> get_text_entities_object(const vector<MessageEntity> &entities);
 
@@ -141,7 +135,6 @@ vector<Slice> find_mentions(Slice str);
 vector<Slice> find_bot_commands(Slice str);
 vector<Slice> find_hashtags(Slice str);
 vector<Slice> find_cashtags(Slice str);
-vector<Slice> find_bank_card_numbers(Slice str);
 bool is_email_address(Slice str);
 vector<std::pair<Slice, bool>> find_urls(Slice str);  // slice + is_email_address
 
@@ -150,10 +143,6 @@ string get_first_url(Slice text, const vector<MessageEntity> &entities);
 Result<vector<MessageEntity>> parse_markdown(string &text);
 
 Result<vector<MessageEntity>> parse_markdown_v2(string &text);
-
-FormattedText parse_markdown_v3(FormattedText text);
-
-FormattedText get_markdown_v3(FormattedText text);
 
 Result<vector<MessageEntity>> parse_html(string &text);
 

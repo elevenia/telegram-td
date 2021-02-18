@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -25,7 +25,7 @@
 #include <type_traits>
 
 namespace td {
-namespace log_event {
+namespace logevent {
 
 template <class ParentT>
 class WithVersion : public ParentT {
@@ -96,11 +96,6 @@ class LogEvent {
     ToggleDialogIsMarkedAsUnreadOnServer = 0x115,
     SetDialogFolderIdOnServer = 0x116,
     DeleteScheduledMessagesFromServer = 0x117,
-    ToggleDialogIsBlockedOnServer = 0x118,
-    ReadMessageThreadHistoryOnServer = 0x119,
-    BlockMessageSenderFromRepliesOnServer = 0x120,
-    UnpinAllDialogMessagesOnServer = 0x121,
-    DeleteAllCallMessagesFromServer = 0x122,
     GetChannelDifference = 0x140,
     AddMessagePushNotification = 0x200,
     EditMessagePushNotification = 0x201,
@@ -110,19 +105,19 @@ class LogEvent {
 
   using Id = uint64;
 
-  Id log_event_id() const {
-    return log_event_id_;
+  Id logevent_id() const {
+    return logevent_id_;
   }
-  void set_log_event_id(Id log_event_id) {
-    log_event_id_ = log_event_id;
+  void set_logevent_id(Id logevent_id) {
+    logevent_id_ = logevent_id;
   }
 
   virtual StringBuilder &print(StringBuilder &sb) const {
-    return sb << "[Logevent " << tag("id", log_event_id()) << "]";
+    return sb << "[Logevent " << tag("id", logevent_id()) << "]";
   }
 
  private:
-  Id log_event_id_{};
+  Id logevent_id_{};
 };
 inline StringBuilder &operator<<(StringBuilder &sb, const LogEvent &log_event) {
   return log_event.print(sb);
@@ -235,6 +230,24 @@ class LogEventStorerUnsafe : public WithContext<TlStorerUnsafe, Global *> {
   }
 };
 
+}  // namespace logevent
+
+using LogEvent = logevent::LogEvent;
+using LogEventParser = logevent::LogEventParser;
+using LogEventStorerCalcLength = logevent::LogEventStorerCalcLength;
+using LogEventStorerUnsafe = logevent::LogEventStorerUnsafe;
+
+template <class T>
+Status log_event_parse(T &data, Slice slice) TD_WARN_UNUSED_RESULT;
+
+template <class T>
+Status log_event_parse(T &data, Slice slice) {
+  LogEventParser parser(slice);
+  parse(data, parser);
+  parser.fetch_end();
+  return parser.get_status();
+}
+
 template <class T>
 class LogEventStorerImpl : public Storer {
  public:
@@ -260,24 +273,6 @@ class LogEventStorerImpl : public Storer {
   const T &event_;
 };
 
-}  // namespace log_event
-
-using LogEvent = log_event::LogEvent;
-using LogEventParser = log_event::LogEventParser;
-using LogEventStorerCalcLength = log_event::LogEventStorerCalcLength;
-using LogEventStorerUnsafe = log_event::LogEventStorerUnsafe;
-
-template <class T>
-Status log_event_parse(T &data, Slice slice) TD_WARN_UNUSED_RESULT;
-
-template <class T>
-Status log_event_parse(T &data, Slice slice) {
-  LogEventParser parser(slice);
-  parse(data, parser);
-  parser.fetch_end();
-  return parser.get_status();
-}
-
 template <class T>
 BufferSlice log_event_store(const T &data) {
   LogEventStorerCalcLength storer_calc_length;
@@ -295,11 +290,6 @@ BufferSlice log_event_store(const T &data) {
   log_event_parse(check_result, value_buffer.as_slice()).ensure();
 #endif
   return value_buffer;
-}
-
-template <class T>
-log_event::LogEventStorerImpl<T> get_log_event_storer(const T &event) {
-  return log_event::LogEventStorerImpl<T>(event);
 }
 
 }  // namespace td

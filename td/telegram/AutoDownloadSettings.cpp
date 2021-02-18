@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -39,7 +39,7 @@ class GetAutoDownloadSettingsQuery : public Td::ResultHandler {
   }
 
   void send() {
-    send_query(G()->net_query_creator().create(telegram_api::account_getAutoDownloadSettings()));
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::account_getAutoDownloadSettings())));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -94,8 +94,8 @@ class SaveAutoDownloadSettingsQuery : public Td::ResultHandler {
     if (type == NetType::WiFi) {
       flags |= telegram_api::account_saveAutoDownloadSettings::HIGH_MASK;
     }
-    send_query(G()->net_query_creator().create(telegram_api::account_saveAutoDownloadSettings(
-        flags, false /*ignored*/, false /*ignored*/, get_input_auto_download_settings(settings))));
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::account_saveAutoDownloadSettings(
+        flags, false /*ignored*/, false /*ignored*/, get_input_auto_download_settings(settings)))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {

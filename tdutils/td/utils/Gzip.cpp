@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -184,12 +184,12 @@ BufferSlice gzdecode(Slice s) {
   return message.extract_reader().move_as_buffer_slice();
 }
 
-BufferSlice gzencode(Slice s, double max_compression_ratio) {
+BufferSlice gzencode(Slice s, double k) {
   Gzip gzip;
   gzip.init_encode().ensure();
   gzip.set_input(s);
   gzip.close_input();
-  size_t max_size = static_cast<size_t>(static_cast<double>(s.size()) * max_compression_ratio);
+  size_t max_size = static_cast<size_t>(static_cast<double>(s.size()) * k);
   BufferWriter message{max_size};
   gzip.set_output(message.prepare_append());
   auto r_state = gzip.run();

@@ -10,24 +10,22 @@ class DoxygenTlDocumentationGenerator extends TlDocumentationGenerator
             case 'Bool':
                 return 'bool ';
             case 'int32':
-                return 'int32 ';
+                return 'std::int32_t ';
             case 'int53':
-                return 'int53 ';
             case 'int64':
-                return 'int64 ';
+                return 'std::int64_t ';
             case 'double':
                 return 'double ';
             case 'string':
-                return 'string const &';
             case 'bytes':
-                return 'bytes const &';
+                return 'std::string const &';
 
             default:
                 if (substr($type, 0, 6) === 'vector') {
                     if ($type[6] !== '<' || $type[strlen($type) - 1] !== '>') {
                         return '';
                     }
-                    return 'array<'.$this->getTypeName(substr($type, 7, -1)).'> &&';
+                    return 'std::vector<'.$this->getTypeName(substr($type, 7, -1)).'> &&';
                 }
 
                 if (preg_match('/[^A-Za-z0-9.]/', $type)) {
@@ -69,17 +67,15 @@ class DoxygenTlDocumentationGenerator extends TlDocumentationGenerator
             case 'Bool':
                 return 'bool';
             case 'int32':
-                return 'int32';
+                return 'std::int32_t';
             case 'int53':
-                return 'int53';
             case 'int64':
-                return 'int64';
+                return 'std::int64_t';
             case 'double':
                 return 'double';
             case 'string':
-                return 'string';
             case 'bytes':
-                return 'bytes';
+                return 'std::string';
             case 'bool':
             case 'int':
             case 'long':
@@ -99,7 +95,7 @@ class DoxygenTlDocumentationGenerator extends TlDocumentationGenerator
                         $this->printError("Wrong vector subtype in $type");
                         return '';
                     }
-                    return 'array<'.$this->getTypeName(substr($type, 7, -1)).'>';
+                    return 'std::vector<'.$this->getTypeName(substr($type, 7, -1)).'>';
                 }
 
                 if (preg_match('/[^A-Za-z0-9.]/', $type)) {
@@ -127,7 +123,6 @@ class DoxygenTlDocumentationGenerator extends TlDocumentationGenerator
         return empty($tline) || $tline[0] === '}' || $tline === 'public:' || strpos($line, '#pragma ') === 0 ||
             strpos($line, '#include <') === 0 || strpos($tline, 'return ') === 0 || strpos($tline, 'namespace') === 0 ||
             preg_match('/class [A-Za-z0-9_]*;/', $line) || $tline === 'if (value == nullptr) {' ||
-            strpos($tline, 'result += ') === 0 || strpos($tline, 'result = ') || strpos($tline, ' : values') ||
             strpos($line, 'JNIEnv') || strpos($line, 'jfieldID') || $tline === 'virtual ~Object() {' ||
             $tline === 'virtual void store(TlStorerToString &s, const char *field_name) const = 0;';
     }
@@ -170,48 +165,6 @@ class DoxygenTlDocumentationGenerator extends TlDocumentationGenerator
 EOT
 );
 
-        $this->addDocumentation('using int32 = std::int32_t;', <<<EOT
-/**
- * This type is used to store 32-bit signed integers, which can be represented as Number in JSON.
- */
-EOT
-);
-
-        $this->addDocumentation('using int53 = std::int64_t;', <<<EOT
-/**
- * This type is used to store 53-bit signed integers, which can be represented as Number in JSON.
- */
-EOT
-);
-
-        $this->addDocumentation('using int64 = std::int64_t;', <<<EOT
-/**
- * This type is used to store 64-bit signed integers, which can't be represented as Number in JSON and are represented as String instead.
- */
-EOT
-);
-
-        $this->addDocumentation('using string = std::string;', <<<EOT
-/**
- * This type is used to store UTF-8 strings.
- */
-EOT
-);
-
-        $this->addDocumentation('using bytes = std::string;', <<<EOT
-/**
- * This type is used to store arbitrary sequences of bytes. In JSON interface the bytes are base64-encoded.
- */
-EOT
-);
-
-        $this->addDocumentation('using array = std::vector<Type>;', <<<EOT
-/**
- * This type is used to store a list of objects of any type and is represented as Array in JSON.
- */
-EOT
-);
-
         $this->addDocumentation('using BaseObject', <<<EOT
 /**
  * This class is a base class for all TDLib API classes and functions.
@@ -233,8 +186,8 @@ EOT
  * \\code
  * auto get_authorization_state_request = td::td_api::make_object<td::td_api::getAuthorizationState>();
  * auto message_text = td::td_api::make_object<td::td_api::formattedText>("Hello, world!!!",
- *                     td::td_api::array<td::td_api::object_ptr<td::td_api::textEntity>>());
- * auto send_message_request = td::td_api::make_object<td::td_api::sendMessage>(chat_id, 0, 0, nullptr, nullptr,
+ *                     std::vector<td::td_api::object_ptr<td::td_api::textEntity>>());
+ * auto send_message_request = td::td_api::make_object<td::td_api::sendMessage>(chat_id, 0, nullptr, nullptr,
  *      td::td_api::make_object<td::td_api::inputMessageText>(std::move(message_text), false, true));
  * \\endcode
  *
@@ -295,7 +248,7 @@ EOT
 
         $this->addDocumentation('std::string to_string(const BaseObject &value);', <<<EOT
 /**
- * Returns a string representation of a TDLib API object.
+ * Returns a string representation of the TDLib API object.
  * \\param[in] value The object.
  * \\return Object string representation.
  */
@@ -304,20 +257,10 @@ EOT
 
         $this->addDocumentation('std::string to_string(const object_ptr<T> &value) {', <<<EOT
 /**
- * Returns a string representation of a TDLib API object.
+ * Returns a string representation of the TDLib API object.
  * \\tparam T Object type, auto-deduced.
  * \\param[in] value The object.
  * \\return Object string representation.
- */
-EOT
-);
-
-        $this->addDocumentation('std::string to_string(const std::vector<object_ptr<T>> &values) {', <<<EOT
-/**
- * Returns a string representation of a list of TDLib API objects.
- * \\tparam T Object type, auto-deduced.
- * \\param[in] values The objects.
- * \\return Objects string representation.
  */
 EOT
 );

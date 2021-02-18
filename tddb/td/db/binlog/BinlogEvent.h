@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -32,6 +32,11 @@ inline auto EmptyStorer() {
   return create_default_storer(impl);
 }
 
+static constexpr size_t MAX_EVENT_SIZE = 1 << 24;
+static constexpr size_t EVENT_HEADER_SIZE = 4 + 8 + 4 + 4 + 8;
+static constexpr size_t EVENT_TAIL_SIZE = 4;
+static constexpr size_t MIN_EVENT_SIZE = EVENT_HEADER_SIZE + EVENT_TAIL_SIZE;
+
 extern int32 VERBOSITY_NAME(binlog);
 
 struct BinlogDebugInfo {
@@ -41,7 +46,6 @@ struct BinlogDebugInfo {
   const char *file{""};
   int line{0};
 };
-
 inline StringBuilder &operator<<(StringBuilder &sb, const BinlogDebugInfo &info) {
   if (info.line == 0) {
     return sb;
@@ -50,11 +54,6 @@ inline StringBuilder &operator<<(StringBuilder &sb, const BinlogDebugInfo &info)
 }
 
 struct BinlogEvent {
-  static constexpr size_t MAX_SIZE = 1 << 24;
-  static constexpr size_t HEADER_SIZE = 4 + 8 + 4 + 4 + 8;
-  static constexpr size_t TAIL_SIZE = 4;
-  static constexpr size_t MIN_SIZE = HEADER_SIZE + TAIL_SIZE;
-
   int64 offset_;
 
   uint32 size_;
@@ -108,8 +107,6 @@ struct BinlogEvent {
   }
 
   Status validate() const;
-
-  void realloc();
 };
 
 inline StringBuilder &operator<<(StringBuilder &sb, const BinlogEvent &event) {

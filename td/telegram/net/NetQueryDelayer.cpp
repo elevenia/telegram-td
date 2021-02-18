@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -46,30 +46,30 @@ void NetQueryDelayer::delay(NetQueryPtr query) {
   }
 
   if (timeout == 0) {
-    timeout = query->next_timeout_;
+    timeout = query->next_timeout;
     if (timeout < 60) {
-      query->next_timeout_ *= 2;
+      query->next_timeout *= 2;
     }
   } else {
-    query->next_timeout_ = 1;
+    query->next_timeout = 1;
   }
-  query->total_timeout_ += timeout;
-  query->last_timeout_ = timeout;
+  query->total_timeout += timeout;
+  query->last_timeout = timeout;
 
   auto error = query->error().move_as_error();
   query->resend();
 
   // Fix for infinity flood control
-  if (!query->need_resend_on_503_ && code == -503) {
+  if (!query->need_resend_on_503 && code == -503) {
     query->set_error(Status::Error(502, "Bad Gateway"));
     query->debug("DcManager: send to DcManager");
     G()->net_query_dispatcher().dispatch(std::move(query));
     return;
   }
 
-  if (query->total_timeout_ > query->total_timeout_limit_) {
+  if (query->total_timeout > query->total_timeout_limit) {
     // TODO: support timeouts in DcAuth and GetConfig
-    LOG(WARNING) << "Failed: " << query << " " << tag("timeout", timeout) << tag("total_timeout", query->total_timeout_)
+    LOG(WARNING) << "Failed: " << query << " " << tag("timeout", timeout) << tag("total_timeout", query->total_timeout)
                  << " because of " << error << " from " << query->source_;
     // NB: code must differ from tdapi FLOOD_WAIT code
     query->set_error(
@@ -79,7 +79,7 @@ void NetQueryDelayer::delay(NetQueryPtr query) {
     return;
   }
 
-  LOG(WARNING) << "Delay: " << query << " " << tag("timeout", timeout) << tag("total_timeout", query->total_timeout_)
+  LOG(WARNING) << "Delay: " << query << " " << tag("timeout", timeout) << tag("total_timeout", query->total_timeout)
                << " because of " << error << " from " << query->source_;
   query->debug(PSTRING() << "delay for " << format::as_time(timeout));
   auto id = container_.create(QuerySlot());

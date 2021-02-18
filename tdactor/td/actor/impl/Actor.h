@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -88,13 +88,13 @@ inline uint64 Actor::get_link_token() {
 inline std::shared_ptr<ActorContext> Actor::set_context(std::shared_ptr<ActorContext> context) {
   return info_->set_context(std::move(context));
 }
-inline string Actor::set_tag(string tag) {
-  auto *ctx = info_->get_context();
-  string old_tag;
-  if (ctx->tag_) {
-    old_tag = ctx->tag_;
+inline CSlice Actor::set_tag(CSlice tag) {
+  auto &tag_ref = info_->get_context()->tag_;
+  CSlice old_tag;
+  if (tag_ref) {
+    old_tag = CSlice(tag_ref);
   }
-  ctx->set_tag(std::move(tag));
+  tag_ref = tag.c_str();
   Scheduler::on_context_updated();
   return old_tag;
 }
@@ -125,10 +125,12 @@ ActorId<SelfT> Actor::actor_id(SelfT *self) {
   return ActorId<SelfT>(info_.get_weak());
 }
 
+inline ActorShared<> Actor::actor_shared() {
+  return actor_shared(this);
+}
 template <class SelfT>
 ActorShared<SelfT> Actor::actor_shared(SelfT *self, uint64 id) {
   CHECK(static_cast<Actor *>(self) == this);
-  CHECK(id != 0);
   return ActorShared<SelfT>(actor_id(self), id);
 }
 

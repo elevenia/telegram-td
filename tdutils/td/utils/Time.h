@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -28,10 +28,6 @@ class Time {
     // As an alternative we may say that now_cached is a thread local copy of now
     return now();
   }
-  static double now_unadjusted();
-
-  // Used for testing. After jump_in_future(at) is called, now() >= at.
-  static void jump_in_future(double at);
 };
 
 inline void relax_timeout_at(double *timeout, double new_timeout) {
@@ -62,15 +58,12 @@ class Timestamp {
     return Timestamp{timeout - Clocks::system() + Time::now()};
   }
 
-  static Timestamp in(double timeout, Timestamp now = now_cached()) {
-    return Timestamp{now.at() + timeout};
+  static Timestamp in(double timeout) {
+    return Timestamp{Time::now_cached() + timeout};
   }
 
-  bool is_in_past(Timestamp now) const {
-    return at_ <= now.at();
-  }
   bool is_in_past() const {
-    return is_in_past(now_cached());
+    return at_ <= Time::now_cached();
   }
 
   explicit operator bool() const {
@@ -105,10 +98,6 @@ class Timestamp {
   explicit Timestamp(double timeout) : at_(timeout) {
   }
 };
-
-inline bool operator<(const Timestamp &a, const Timestamp &b) {
-  return a.at() < b.at();
-}
 
 template <class StorerT>
 void store(const Timestamp &timestamp, StorerT &storer) {

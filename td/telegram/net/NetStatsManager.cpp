@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -9,14 +9,12 @@
 #include "td/actor/actor.h"
 #include "td/actor/PromiseFuture.h"
 
-#include "td/telegram/ConfigShared.h"
 #include "td/telegram/Global.h"
 #include "td/telegram/logevent/LogEvent.h"
 #include "td/telegram/StateManager.h"
 #include "td/telegram/TdDb.h"
 #include "td/telegram/Version.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/common.h"
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
@@ -61,9 +59,9 @@ void NetStatsManager::init() {
   };
 
   for_each_stat([&](NetStatsInfo &stat, size_t id, CSlice name, FileType file_type) {
-    auto main_file_type = get_main_file_type(file_type);
-    id += static_cast<size_t>(main_file_type) - static_cast<size_t>(file_type);
-
+    if (file_type == FileType::SecureRaw || file_type == FileType::Wallpaper) {
+      id++;
+    }
     stat.key = "net_stats_" + name.str();
     stat.stats.set_callback(make_unique<NetStatsInternalCallback>(actor_id(this), id));
   });
@@ -87,7 +85,7 @@ void NetStatsManager::get_network_stats(bool current, Promise<NetworkStats> prom
       if (id == 0) {
       } else if (id == 1) {
         total = stats;
-      } else if (id == CALL_NET_STATS_ID) {
+      } else if (id == call_net_stats_id_) {
       } else if (file_type != FileType::None) {
         total_files = total_files + stats;
       }
@@ -110,11 +108,11 @@ void NetStatsManager::get_network_stats(bool current, Promise<NetworkStats> prom
       entry.duration = stats.duration;
       if (id == 0) {
         result.entries.push_back(std::move(entry));
-      } else if (id == CALL_NET_STATS_ID) {
+      } else if (id == call_net_stats_id_) {
         entry.is_call = true;
         result.entries.push_back(std::move(entry));
       } else if (file_type != FileType::None) {
-        if (get_main_file_type(file_type) != file_type) {
+        if (file_type == FileType::SecureRaw || file_type == FileType::Wallpaper) {
           return;
         }
 
@@ -122,14 +120,14 @@ void NetStatsManager::get_network_stats(bool current, Promise<NetworkStats> prom
           entry.rx = static_cast<int64>(static_cast<double>(total.read_size) *
                                         (static_cast<double>(entry.rx) / static_cast<double>(total_files.read_size)));
         } else {
-          // entry.rx += total.read_size / MAX_FILE_TYPE;
+          // entry.rx += total.read_size / file_type_size;
         }
 
         if (total_files.write_size != 0) {
           entry.tx = static_cast<int64>(static_cast<double>(total.write_size) *
                                         (static_cast<double>(entry.tx) / static_cast<double>(total_files.write_size)));
         } else {
-          // entry.tx += total.write_size / MAX_FILE_TYPE;
+          // entry.tx += total.write_size / file_type_size;
         }
         check.read_size += entry.rx;
         check.write_size += entry.tx;
@@ -171,7 +169,7 @@ void NetStatsManager::add_network_stats(const NetworkStatsEntry &entry) {
   }
   add_network_stats_impl(media_net_stats_, entry);
   size_t file_type_n = static_cast<size_t>(entry.file_type);
-  CHECK(file_type_n < static_cast<size_t>(MAX_FILE_TYPE));
+  CHECK(file_type_n < static_cast<size_t>(file_type_size));
   add_network_stats_impl(files_stats_[file_type_n], entry);
 }
 
@@ -194,7 +192,7 @@ void NetStatsManager::add_network_stats_impl(NetStatsInfo &info, const NetworkSt
 
 void NetStatsManager::start_up() {
   for_each_stat([&](NetStatsInfo &info, size_t id, CSlice name, FileType file_type) {
-    if (get_main_file_type(file_type) != file_type) {
+    if (file_type == FileType::SecureRaw || file_type == FileType::Wallpaper) {
       return;
     }
 
@@ -215,12 +213,8 @@ void NetStatsManager::start_up() {
   auto since_str = G()->td_db()->get_binlog_pmc()->get("net_stats_since");
   if (!since_str.empty()) {
     auto since = to_integer<int32>(since_str);
-    auto authorization_date = G()->shared_config().get_option_integer("authorization_date");
     if (unix_time < since) {
       since_total_ = unix_time;
-      G()->td_db()->get_binlog_pmc()->set("net_stats_since", to_string(since_total_));
-    } else if (since < authorization_date - 3600) {
-      since_total_ = narrow_cast<int32>(authorization_date);
       G()->td_db()->get_binlog_pmc()->set("net_stats_since", to_string(since_total_));
     } else {
       since_total_ = since;
@@ -257,12 +251,8 @@ std::shared_ptr<NetStatsCallback> NetStatsManager::get_media_stats_callback() co
 
 std::vector<std::shared_ptr<NetStatsCallback>> NetStatsManager::get_file_stats_callbacks() const {
   auto result = transform(files_stats_, [](auto &stat) { return stat.stats.get_callback(); });
-  for (int32 i = 0; i < MAX_FILE_TYPE; i++) {
-    int32 main_file_type = static_cast<int32>(get_main_file_type(static_cast<FileType>(i)));
-    if (main_file_type != i) {
-      result[i] = result[main_file_type];
-    }
-  }
+  result[static_cast<int32>(FileType::SecureRaw)] = result[static_cast<int32>(FileType::Secure)];
+  result[static_cast<int32>(FileType::Wallpaper)] = result[static_cast<int32>(FileType::Background)];
   return result;
 }
 
@@ -292,10 +282,6 @@ void NetStatsManager::update(NetStatsInfo &info, bool force_save) {
 }
 
 void NetStatsManager::save_stats(NetStatsInfo &info, NetType net_type) {
-  if (G()->shared_config().get_option_boolean("disable_persistent_network_statistics")) {
-    return;
-  }
-
   auto net_type_i = static_cast<size_t>(net_type);
   auto &type_stats = info.stats_by_type[net_type_i];
 

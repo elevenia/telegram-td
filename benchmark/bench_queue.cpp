@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -43,6 +43,7 @@
 //}
 //}
 
+// TODO: warnings and asserts. There should be no warnings or debug output in production.
 using qvalue_t = int;
 
 // Just for testing, not production
@@ -837,7 +838,7 @@ class QueueBenchmark : public td::Benchmark {
 
 template <class QueueT>
 class RingBenchmark : public td::Benchmark {
-  static constexpr int QN = 504;
+  enum { QN = 504 };
 
   struct Thread {
     int int_id;
@@ -903,12 +904,12 @@ class RingBenchmark : public td::Benchmark {
 
 void test_queue() {
   std::vector<td::thread> threads;
-  static constexpr size_t THREAD_COUNT = 100;
-  std::vector<td::MpscPollableQueue<int>> queues(THREAD_COUNT);
+  constexpr size_t threads_n = 100;
+  std::vector<td::MpscPollableQueue<int>> queues(threads_n);
   for (auto &q : queues) {
     q.init();
   }
-  for (size_t i = 0; i < THREAD_COUNT; i++) {
+  for (size_t i = 0; i < threads_n; i++) {
     threads.emplace_back([&q = queues[i]] {
       while (true) {
         auto got = q.reader_wait_nonblock();
@@ -923,7 +924,7 @@ void test_queue() {
   while (true) {
     td::usleep_for(100);
     for (int i = 0; i < 5; i++) {
-      queues[td::Random::fast(0, THREAD_COUNT - 1)].writer_put(1);
+      queues[td::Random::fast(0, threads_n - 1)].writer_put(1);
     }
   }
 }
@@ -974,4 +975,6 @@ int main() {
   // BENCH_Q(BufferQueue, 100);
   // BENCH_Q(BufferQueue, 10);
   // BENCH_Q(BufferQueue, 1);
+
+  return 0;
 }

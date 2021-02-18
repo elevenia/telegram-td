@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -118,10 +118,10 @@ class BinlogReader {
       it.advance(4, MutableSlice(buf, 4));
       size_ = static_cast<size_t>(TlParser(Slice(buf, 4)).fetch_int());
 
-      if (size_ > BinlogEvent::MAX_SIZE) {
+      if (size_ > MAX_EVENT_SIZE) {
         return Status::Error(PSLICE() << "Too big event " << tag("size", size_));
       }
-      if (size_ < BinlogEvent::MIN_SIZE) {
+      if (size_ < MIN_EVENT_SIZE) {
         return Status::Error(PSLICE() << "Too small event " << tag("size", size_));
       }
       if (size_ % 4 != 0) {
@@ -240,7 +240,7 @@ void Binlog::add_event(BinlogEvent &&event) {
     auto need_reindex = [&](int64 min_size, int rate) {
       return fd_size > min_size && fd_size / rate > processor_->total_raw_events_size();
     };
-    if (need_reindex(50000, 5) || need_reindex(100000, 4) || need_reindex(300000, 3) || need_reindex(500000, 2)) {
+    if (need_reindex(100000, 5) || need_reindex(500000, 2)) {
       LOG(INFO) << tag("fd_size", format::as_size(fd_size))
                 << tag("total events size", format::as_size(processor_->total_raw_events_size()));
       do_reindex();
@@ -291,11 +291,6 @@ Status Binlog::close(bool need_sync) {
   info_.is_opened = false;
   need_sync_ = false;
   return Status::OK();
-}
-
-void Binlog::close(Promise<> promise) {
-  TRY_STATUS_PROMISE(promise, close());
-  promise.set_value({});
 }
 
 void Binlog::change_key(DbKey new_db_key) {
@@ -647,7 +642,6 @@ void Binlog::do_reindex() {
   fd_events_ = 0;
   reset_encryption();
   processor_->for_each([&](BinlogEvent &event) {
-    event.realloc();
     do_event(std::move(event));  // NB: no move is actually happens
   });
   need_sync_ = true;  // must sync creation of the file
@@ -668,16 +662,9 @@ void Binlog::do_reindex() {
       << fd_size_ << ' ' << detail::file_size(path_) << ' ' << fd_events_ << ' ' << path_;
 
   double ratio = static_cast<double>(start_size) / static_cast<double>(finish_size + 1);
-
-  [&](Slice msg) {
-    if (start_size > (10 << 20) || finish_time - start_time > 1) {
-      LOG(WARNING) << "Slow " << msg;
-    } else {
-      LOG(INFO) << msg;
-    }
-  }(PSLICE() << "Regenerate index " << tag("name", path_) << tag("time", format::as_time(finish_time - start_time))
-             << tag("before_size", format::as_size(start_size)) << tag("after_size", format::as_size(finish_size))
-             << tag("ratio", ratio) << tag("before_events", start_events) << tag("after_events", finish_events));
+  LOG(INFO) << "Regenerate index " << tag("name", path_) << tag("time", format::as_time(finish_time - start_time))
+            << tag("before_size", format::as_size(start_size)) << tag("after_size", format::as_size(finish_size))
+            << tag("ratio", ratio) << tag("before_events", start_events) << tag("after_events", finish_events);
 
   buffer_writer_ = ChainBufferWriter();
   buffer_reader_ = buffer_writer_.extract_reader();

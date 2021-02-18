@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -32,25 +32,147 @@ std::pair<T, T> split(T s, char delimiter = ' ') {
 }
 
 template <class T>
-vector<T> full_split(T s, char delimiter = ' ', size_t max_parts = std::numeric_limits<size_t>::max()) {
+vector<T> full_split(T s, char delimiter = ' ') {
   vector<T> result;
   if (s.empty()) {
     return result;
   }
-  while (result.size() + 1 < max_parts) {
+  while (true) {
     auto delimiter_pos = s.find(delimiter);
     if (delimiter_pos == string::npos) {
-      break;
+      result.push_back(std::move(s));
+      return result;
+    } else {
+      result.push_back(s.substr(0, delimiter_pos));
+      s = s.substr(delimiter_pos + 1);
     }
-
-    result.push_back(s.substr(0, delimiter_pos));
-    s = s.substr(delimiter_pos + 1);
   }
-  result.push_back(std::move(s));
-  return result;
 }
 
 string implode(const vector<string> &v, char delimiter = ' ');
+
+namespace detail {
+
+template <typename V>
+struct transform_helper {
+  template <class Func>
+  auto transform(const V &v, const Func &f) {
+    vector<decltype(f(*v.begin()))> result;
+    result.reserve(v.size());
+    for (auto &x : v) {
+      result.push_back(f(x));
+    }
+    return result;
+  }
+
+  template <class Func>
+  auto transform(V &&v, const Func &f) {
+    vector<decltype(f(std::move(*v.begin())))> result;
+    result.reserve(v.size());
+    for (auto &x : v) {
+      result.push_back(f(std::move(x)));
+    }
+    return result;
+  }
+};
+
+}  // namespace detail
+
+template <class V, class Func>
+auto transform(V &&v, const Func &f) {
+  return detail::transform_helper<std::decay_t<V>>().transform(std::forward<V>(v), f);
+}
+
+template <class V, class Func>
+void remove_if(V &v, const Func &f) {
+  size_t i = 0;
+  while (i != v.size() && !f(v[i])) {
+    i++;
+  }
+  if (i == v.size()) {
+    return;
+  }
+
+  size_t j = i;
+  while (++i != v.size()) {
+    if (!f(v[i])) {
+      v[j++] = std::move(v[i]);
+    }
+  }
+  v.erase(v.begin() + j, v.end());
+}
+
+template <class V, class T>
+bool remove(V &v, const T &value) {
+  size_t i = 0;
+  while (i != v.size() && v[i] != value) {
+    i++;
+  }
+  if (i == v.size()) {
+    return false;
+  }
+
+  size_t j = i;
+  while (++i != v.size()) {
+    if (v[i] != value) {
+      v[j++] = std::move(v[i]);
+    }
+  }
+  v.erase(v.begin() + j, v.end());
+  return true;
+}
+
+template <class V, class T>
+bool contains(const V &v, const T &value) {
+  for (auto &x : v) {
+    if (x == value) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <class T>
+void reset_to_empty(T &value) {
+  using std::swap;
+  std::decay_t<T> tmp;
+  swap(tmp, value);
+}
+
+template <class T>
+void append(vector<T> &destination, const vector<T> &source) {
+  destination.insert(destination.end(), source.begin(), source.end());
+}
+
+template <class T>
+void append(vector<T> &destination, vector<T> &&source) {
+  if (destination.empty()) {
+    destination.swap(source);
+    return;
+  }
+  destination.reserve(destination.size() + source.size());
+  for (auto &elem : source) {
+    destination.push_back(std::move(elem));
+  }
+  reset_to_empty(source);
+}
+
+template <class T>
+void combine(vector<T> &destination, const vector<T> &source) {
+  append(destination, source);
+}
+
+template <class T>
+void combine(vector<T> &destination, vector<T> &&source) {
+  if (destination.size() < source.size()) {
+    destination.swap(source);
+  }
+  destination.reserve(destination.size() + source.size());
+  for (auto &elem : source) {
+    destination.push_back(std::move(elem));
+  }
+  reset_to_empty(source);
+}
 
 inline bool begins_with(Slice str, Slice prefix) {
   return prefix.size() <= str.size() && prefix == Slice(str.data(), prefix.size());
@@ -68,11 +190,10 @@ inline char to_lower(char c) {
   return c;
 }
 
-inline MutableSlice to_lower_inplace(MutableSlice slice) {
+inline void to_lower_inplace(MutableSlice slice) {
   for (auto &c : slice) {
     c = to_lower(c);
   }
-  return slice;
 }
 
 inline string to_lower(Slice slice) {
@@ -142,11 +263,7 @@ T trim(T str) {
   return T(begin, end);
 }
 
-string lpad(string str, size_t size, char c);
-
-string lpad0(const string str, size_t size);
-
-string rpad(string str, size_t size, char c);
+string lpad0(string str, size_t size);
 
 string oneline(Slice str);
 
@@ -193,7 +310,7 @@ template <class T>
 Result<T> to_integer_safe(Slice str) {
   auto res = to_integer<T>(str);
   if ((PSLICE() << res) != str) {
-    return Status::Error(PSLICE() << "Can't parse \"" << str << "\" as an integer");
+    return Status::Error(PSLICE() << "Can't parse \"" << str << "\" as number");
   }
   return res;
 }
@@ -220,24 +337,6 @@ typename std::enable_if<std::is_unsigned<T>::value, T>::type hex_to_integer(Slic
   return integer_value;
 }
 
-template <class T>
-Result<typename std::enable_if<std::is_unsigned<T>::value, T>::type> hex_to_integer_safe(Slice str) {
-  T integer_value = 0;
-  auto begin = str.begin();
-  auto end = str.end();
-  while (begin != end) {
-    T digit = hex_to_int(*begin++);
-    if (digit == 16) {
-      return Status::Error("Not a hex digit");
-    }
-    if (integer_value > std::numeric_limits<T>::max() / 16) {
-      return Status::Error("Hex number overflow");
-    }
-    integer_value = integer_value * 16 + digit;
-  }
-  return integer_value;
-}
-
 double to_double(Slice str);
 
 template <class T>
@@ -256,10 +355,6 @@ Result<string> hex_decode(Slice hex);
 string hex_encode(Slice data);
 
 string url_encode(Slice data);
-
-size_t url_decode(Slice from, MutableSlice to, bool decode_plus_sign_as_space);
-
-MutableSlice url_decode_inplace(MutableSlice str, bool decode_plus_sign_as_space);
 
 // run-time checked narrowing cast (type conversion):
 
@@ -329,6 +424,28 @@ template <int Alignment, class T>
 bool is_aligned_pointer(const T *pointer) {
   static_assert(Alignment > 0 && (Alignment & (Alignment - 1)) == 0, "Wrong alignment");
   return (reinterpret_cast<std::uintptr_t>(static_cast<const void *>(pointer)) & (Alignment - 1)) == 0;
+}
+
+namespace detail {
+template <typename T>
+struct reversion_wrapper {
+  T &iterable;
+};
+
+template <typename T>
+auto begin(reversion_wrapper<T> w) {
+  return w.iterable.rbegin();
+}
+
+template <typename T>
+auto end(reversion_wrapper<T> w) {
+  return w.iterable.rend();
+}
+}  // namespace detail
+
+template <typename T>
+detail::reversion_wrapper<T> reversed(T &iterable) {
+  return {iterable};
 }
 
 string buffer_to_hex(Slice buffer);

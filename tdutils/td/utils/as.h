@@ -1,12 +1,10 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 #pragma once
-
-#include "td/utils/type_traits.h"
 
 #include <cstring>
 #include <type_traits>
@@ -30,7 +28,7 @@ class As {
   }
   ~As() = default;
 
-  As &operator=(const T &new_value) && {
+  As &operator=(T new_value) && {
     std::memcpy(ptr_, &new_value, sizeof(T));
     return *this;
   }
@@ -65,6 +63,13 @@ class ConstAs {
 };
 
 }  // namespace detail
+
+// no std::is_trivially_copyable in libstdc++ before 5.0
+#if __GLIBCXX__
+#define TD_IS_TRIVIALLY_COPYABLE(T) __has_trivial_copy(T)
+#else
+#define TD_IS_TRIVIALLY_COPYABLE(T) std::is_trivially_copyable<T>::value
+#endif
 
 template <class ToT, class FromT,
           std::enable_if_t<TD_IS_TRIVIALLY_COPYABLE(ToT) && TD_IS_TRIVIALLY_COPYABLE(FromT), int> = 0>

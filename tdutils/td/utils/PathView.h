@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -28,7 +28,6 @@ class PathView {
   Slice parent_dir() const {
     return path_.substr(0, last_slash_ + 1);
   }
-  Slice parent_dir_noslash() const;
 
   Slice extension() const {
     if (last_dot_ == static_cast<int32>(path_.size())) {
@@ -62,7 +61,6 @@ class PathView {
   }
 
   static Slice relative(Slice path, Slice dir, bool force = false);
-  static Slice dir_and_file(Slice path);
 
  private:
   static bool is_slash(char c) {

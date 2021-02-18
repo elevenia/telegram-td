@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -105,28 +105,24 @@ template <class T>
 class OneValue<T *> {
  public:
   bool set_value(T *value) {
-    T *was = Empty();
+    T *was = nullptr;
     return state_.compare_exchange_strong(was, value, std::memory_order_acq_rel);
   }
   bool get_value(T *&value) {
     value = state_.exchange(Taken(), std::memory_order_acq_rel);
-    return value != Empty();
+    return value != nullptr;
   }
   void reset() {
-    state_ = Empty();
+    state_ = nullptr;
   }
   OneValue() {
   }
 
  private:
-  std::atomic<T *> state_{Empty()};
-  static T *Empty() {
-    static int64 xxx;
-    return reinterpret_cast<T *>(&xxx);
-  }
-  static T *Taken() {
-    static int64 xxx;
-    return reinterpret_cast<T *>(&xxx);
+  std::atomic<T *> state_{nullptr};
+  T *Taken() {
+    static T xxx;
+    return &xxx;
   }
 };
 

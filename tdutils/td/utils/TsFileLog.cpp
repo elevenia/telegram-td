@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -13,20 +13,17 @@
 #include "td/utils/Slice.h"
 
 #include <array>
-#include <atomic>
 #include <limits>
-#include <mutex>
 
 namespace td {
 
 namespace detail {
-class TsFileLog : public LogInterface {
+
+class TsFileLogImpl : public LogInterface {
  public:
-  Status init(string path, int64 rotate_threshold, bool redirect_stderr) {
+  Status init(string path) {
     path_ = std::move(path);
-    rotate_threshold_ = rotate_threshold;
-    redirect_stderr_ = redirect_stderr;
-    for (size_t i = 0; i < logs_.size(); i++) {
+    for (int32 i = 0; i < static_cast<int32>(logs_.size()); i++) {
       logs_[i].id = i;
     }
     return init_info(&logs_[0]);
@@ -40,6 +37,9 @@ class TsFileLog : public LogInterface {
     return res;
   }
 
+  void append(CSlice cslice) override {
+    return append(cslice, -1);
+  }
   void append(CSlice cslice, int log_level) override {
     get_current_logger()->append(cslice, log_level);
   }
@@ -47,24 +47,17 @@ class TsFileLog : public LogInterface {
  private:
   struct Info {
     FileLog log;
-    std::atomic<bool> is_inited{false};
-    size_t id;
+    bool is_inited = false;
+    int32 id;
   };
-
-  static constexpr size_t MAX_THREAD_ID = 128;
-  int64 rotate_threshold_;
-  bool redirect_stderr_;
+  static constexpr int32 MAX_THREAD_ID = 128;
   std::string path_;
   std::array<Info, MAX_THREAD_ID> logs_;
-  std::mutex init_mutex_;
 
   LogInterface *get_current_logger() {
     auto *info = get_current_info();
-    if (!info->is_inited.load(std::memory_order_relaxed)) {
-      std::unique_lock<std::mutex> lock(init_mutex_);
-      if (!info->is_inited.load(std::memory_order_relaxed)) {
-        init_info(info).ensure();
-      }
+    if (!info->is_inited) {
+      init_info(info).ensure();
     }
     return &info->log;
   }
@@ -74,31 +67,24 @@ class TsFileLog : public LogInterface {
   }
 
   Status init_info(Info *info) {
-    TRY_STATUS(info->log.init(get_path(info), std::numeric_limits<int64>::max(), info->id == 0 && redirect_stderr_));
+    TRY_STATUS(info->log.init(get_path(info), std::numeric_limits<int64>::max(), info->id == 0));
     info->is_inited = true;
     return Status::OK();
   }
 
-  string get_path(const Info *info) const {
+  string get_path(const Info *info) {
     if (info->id == 0) {
       return path_;
     }
-    return PSTRING() << path_ << ".thread" << info->id << ".log";
-  }
-
-  void rotate() override {
-    for (auto &info : logs_) {
-      if (info.is_inited.load(std::memory_order_acquire)) {
-        info.log.lazy_rotate();
-      }
-    }
+    return PSTRING() << path_ << "." << info->id;
   }
 };
+
 }  // namespace detail
 
-Result<unique_ptr<LogInterface>> TsFileLog::create(string path, int64 rotate_threshold, bool redirect_stderr) {
-  auto res = make_unique<detail::TsFileLog>();
-  TRY_STATUS(res->init(path, rotate_threshold, redirect_stderr));
+Result<unique_ptr<LogInterface>> TsFileLog::create(string path) {
+  auto res = make_unique<detail::TsFileLogImpl>();
+  TRY_STATUS(res->init(path));
   return std::move(res);
 }
 

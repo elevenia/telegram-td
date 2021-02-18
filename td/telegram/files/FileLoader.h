@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,13 +8,14 @@
 
 #include "td/actor/actor.h"
 
-#include "td/telegram/DelayDispatcher.h"
 #include "td/telegram/files/FileLoaderActor.h"
 #include "td/telegram/files/FileLocation.h"
 #include "td/telegram/files/PartsManager.h"
 #include "td/telegram/files/ResourceManager.h"
 #include "td/telegram/files/ResourceState.h"
 #include "td/telegram/net/NetQuery.h"
+
+#include "td/telegram/DelayDispatcher.h"
 
 #include "td/utils/OrderedEventsProcessor.h"
 #include "td/utils/Status.h"
@@ -38,7 +39,8 @@ class FileLoader : public FileLoaderActor {
   void update_resources(const ResourceState &other) override;
 
   void update_local_file_location(const LocalFileLocation &local) override;
-  void update_downloaded_part(int64 offset, int64 limit) override;
+  void update_download_offset(int64 offset) override;
+  void update_download_limit(int64 limit) override;
 
  protected:
   void set_ordered_flag(bool flag);
@@ -128,7 +130,6 @@ class FileLoader : public FileLoaderActor {
   void loop() override;
   Status do_loop();
   void hangup() override;
-  void hangup_shared() override;
   void tear_down() override;
 
   void update_estimated_limit();

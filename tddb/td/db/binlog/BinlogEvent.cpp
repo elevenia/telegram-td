@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -23,12 +23,13 @@ Status BinlogEvent::init(BufferSlice &&raw_event, bool check_crc) {
   type_ = parser.fetch_int();
   flags_ = parser.fetch_int();
   extra_ = parser.fetch_long();
-  CHECK(size_ >= MIN_SIZE);
-  auto slice_data = parser.fetch_string_raw<Slice>(size_ - MIN_SIZE);
+  CHECK(size_ >= MIN_EVENT_SIZE);
+  auto slice_data = parser.fetch_string_raw<Slice>(size_ - MIN_EVENT_SIZE);
   data_ = MutableSlice(const_cast<char *>(slice_data.begin()), slice_data.size());
   crc32_ = static_cast<uint32>(parser.fetch_int());
   if (check_crc) {
-    auto calculated_crc = crc32(raw_event.as_slice().substr(0, size_ - TAIL_SIZE));
+    CHECK(size_ >= EVENT_TAIL_SIZE);
+    auto calculated_crc = crc32(raw_event.as_slice().truncate(size_ - EVENT_TAIL_SIZE));
     if (calculated_crc != crc32_) {
       return Status::Error(PSLICE() << "crc mismatch " << tag("actual", format::as_hex(calculated_crc))
                                     << tag("expected", format::as_hex(crc32_)) << public_to_string());
@@ -43,7 +44,7 @@ Status BinlogEvent::validate() const {
   if (raw_event_.size() < 4) {
     return Status::Error("Too small event");
   }
-  uint32 size = TlParser(raw_event_.as_slice().substr(0, 4)).fetch_int();
+  uint32 size = TlParser(raw_event_.as_slice().truncate(4)).fetch_int();
   if (size_ != size) {
     return Status::Error(PSLICE() << "Size of event changed: " << tag("was", size_) << tag("now", size));
   }
@@ -51,7 +52,7 @@ Status BinlogEvent::validate() const {
 }
 
 BufferSlice BinlogEvent::create_raw(uint64 id, int32 type, int32 flags, const Storer &storer) {
-  auto raw_event = BufferSlice{storer.size() + MIN_SIZE};
+  auto raw_event = BufferSlice{storer.size() + MIN_EVENT_SIZE};
 
   TlStorerUnsafe tl_storer(raw_event.as_slice().ubegin());
   tl_storer.store_int(narrow_cast<int32>(raw_event.size()));
@@ -60,20 +61,13 @@ BufferSlice BinlogEvent::create_raw(uint64 id, int32 type, int32 flags, const St
   tl_storer.store_int(flags);
   tl_storer.store_long(0);
 
-  CHECK(tl_storer.get_buf() == raw_event.as_slice().ubegin() + HEADER_SIZE);
+  CHECK(tl_storer.get_buf() == raw_event.as_slice().ubegin() + EVENT_HEADER_SIZE);
   tl_storer.store_storer(storer);
 
-  CHECK(tl_storer.get_buf() == raw_event.as_slice().uend() - TAIL_SIZE);
-  tl_storer.store_int(::td::crc32(raw_event.as_slice().truncate(raw_event.size() - TAIL_SIZE)));
+  CHECK(tl_storer.get_buf() == raw_event.as_slice().uend() - EVENT_TAIL_SIZE);
+  tl_storer.store_int(::td::crc32(raw_event.as_slice().truncate(raw_event.size() - EVENT_TAIL_SIZE)));
 
   return raw_event;
-}
-
-void BinlogEvent::realloc() {
-  auto data_offset = data_.begin() - raw_event_.as_slice().begin();
-  auto data_size = data_.size();
-  raw_event_ = raw_event_.copy();
-  data_ = raw_event_.as_slice().substr(data_offset, data_size);
 }
 
 }  // namespace td

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -20,17 +20,15 @@ class BinlogActor : public Actor {
   }
   void close(Promise<> promise) {
     binlog_->close().ensure();
-    LOG(INFO) << "Finished to close binlog";
+    promise.set_value(Unit());
+    LOG(INFO) << "Finished closing binlog";
     stop();
-
-    promise.set_value(Unit());  // setting promise can complete closing and destroy the current actor context
   }
   void close_and_destroy(Promise<> promise) {
     binlog_->close_and_destroy().ensure();
-    LOG(INFO) << "Finished to destroy binlog";
+    promise.set_value(Unit());
+    LOG(INFO) << "Finished closing and destroying binlog";
     stop();
-
-    promise.set_value(Unit());  // setting promise can complete closing and destroy the current actor context
   }
 
   struct Event {

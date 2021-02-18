@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -34,13 +34,7 @@ class StateManager final : public Actor {
     virtual bool on_online(bool is_online) {
       return true;
     }
-    virtual bool on_logging_out(bool is_logging_out) {
-      return true;
-    }
   };
-
-  explicit StateManager(ActorShared<> parent) : parent_(std::move(parent)) {
-  }
 
   void on_synchronized(bool is_synchronized);
 
@@ -51,8 +45,6 @@ class StateManager final : public Actor {
   void on_online(bool is_online);
 
   void on_proxy(bool use_proxy);
-
-  void on_logging_out(bool is_logging_out);
 
   void add_callback(unique_ptr<Callback> net_callback);
 
@@ -100,7 +92,6 @@ class StateManager final : public Actor {
   }
 
  private:
-  ActorShared<> parent_;
   uint32 connect_cnt_ = 0;
   uint32 connect_proxy_cnt_ = 0;
   bool sync_flag_ = true;
@@ -109,7 +100,6 @@ class StateManager final : public Actor {
   uint32 network_generation_ = 1;
   bool online_flag_ = false;
   bool use_proxy_ = false;
-  bool is_logging_out_ = false;
 
   static constexpr double UP_DELAY = 0.05;
   static constexpr double DOWN_DELAY = 0.3;
@@ -127,7 +117,7 @@ class StateManager final : public Actor {
   void inc_connect();
   void dec_connect();
 
-  enum class Flag : int32 { Online, State, Network, LoggingOut };
+  enum class Flag : int32 { Online, State, Network };
   void notify_flag(Flag flag);
 
   void start_up() override;

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -19,8 +19,6 @@ namespace td {
 class StringBuilder {
  public:
   explicit StringBuilder(MutableSlice slice, bool use_buffer = false);
-  StringBuilder() : StringBuilder({}, true) {
-  }
 
   void clear() {
     current_ptr_ = begin_ptr_;
@@ -28,7 +26,7 @@ class StringBuilder {
   }
 
   MutableCSlice as_cslice() {
-    if (current_ptr_ >= end_ptr_ + RESERVED_SIZE) {
+    if (current_ptr_ >= end_ptr_ + reserved_size) {
       std::abort();  // shouldn't happen
     }
     *current_ptr_ = 0;
@@ -39,21 +37,8 @@ class StringBuilder {
     return error_flag_;
   }
 
-  template <class T>
-  std::enable_if_t<std::is_same<char *, std::remove_const_t<T>>::value, StringBuilder> &operator<<(T str) {
+  StringBuilder &operator<<(const char *str) {
     return *this << Slice(str);
-  }
-  template <class T>
-  std::enable_if_t<std::is_same<const char *, std::remove_const_t<T>>::value, StringBuilder> &operator<<(T str) {
-    return *this << Slice(str);
-  }
-
-  template <size_t N>
-  StringBuilder &operator<<(char (&str)[N]) = delete;
-
-  template <size_t N>
-  StringBuilder &operator<<(const char (&str)[N]) {
-    return *this << Slice(str, N - 1);
   }
 
   StringBuilder &operator<<(const wchar_t *str) = delete;
@@ -107,6 +92,11 @@ class StringBuilder {
 
   StringBuilder &operator<<(const void *ptr);
 
+  template <class T>
+  StringBuilder &operator<<(const T *ptr) {
+    return *this << static_cast<const void *>(ptr);
+  }
+
  private:
   char *begin_ptr_;
   char *current_ptr_;
@@ -114,7 +104,7 @@ class StringBuilder {
   bool error_flag_ = false;
   bool use_buffer_ = false;
   std::unique_ptr<char[]> buffer_;
-  static constexpr size_t RESERVED_SIZE = 30;
+  static constexpr size_t reserved_size = 30;
 
   StringBuilder &on_error() {
     error_flag_ = true;
@@ -125,7 +115,7 @@ class StringBuilder {
     if (end_ptr_ > current_ptr_) {
       return true;
     }
-    return reserve_inner(RESERVED_SIZE);
+    return reserve_inner(reserved_size);
   }
   bool reserve(size_t size) {
     if (end_ptr_ > current_ptr_ && static_cast<size_t>(end_ptr_ - current_ptr_) >= size) {

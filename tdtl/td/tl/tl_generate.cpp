@@ -1,17 +1,17 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
-#include "td/tl/tl_generate.h"
+#include "tl_generate.h"
 
-#include "td/tl/tl_config.h"
-#include "td/tl/tl_core.h"
-#include "td/tl/tl_file_utils.h"
-#include "td/tl/tl_outputer.h"
-#include "td/tl/tl_string_outputer.h"
-#include "td/tl/tl_writer.h"
+#include "tl_config.h"
+#include "tl_core.h"
+#include "tl_file_utils.h"
+#include "tl_outputer.h"
+#include "tl_string_outputer.h"
+#include "tl_writer.h"
 
 #include <cassert>
 #include <cstdint>
@@ -483,6 +483,7 @@ void write_tl(const tl_config &config, tl_outputer &out, const TL_writer &w) {
   std::size_t types_n = config.get_type_count();
   std::size_t functions_n = config.get_function_count();
 
+  bool found_complex = false;
   for (std::size_t type = 0; type < types_n; type++) {
     tl_type *t = config.get_type_by_num(type);
     assert(t->constructors_num == t->constructors.size());
@@ -490,6 +491,7 @@ void write_tl(const tl_config &config, tl_outputer &out, const TL_writer &w) {
       if (t->name == "Type") {
         assert(t->id == ID_VAR_TYPE);
         t->flags |= FLAG_COMPLEX;
+        found_complex = true;
       }
       continue;
     }
@@ -527,6 +529,7 @@ void write_tl(const tl_config &config, tl_outputer &out, const TL_writer &w) {
                 b.exist_var_num != -1) {
               if (!w.is_built_in_complex_type(t->name)) {
                 t->flags |= FLAG_COMPLEX;
+                found_complex = true;
               }
             } else {
               assert(b_arg_type == NODE_TYPE_TYPE);
@@ -546,13 +549,14 @@ void write_tl(const tl_config &config, tl_outputer &out, const TL_writer &w) {
       if (main_type == NODE_TYPE_VAR_TYPE) {
         if (!w.is_built_in_complex_type(t->name)) {
           t->flags |= FLAG_COMPLEX;
+          found_complex = true;
         }
       }
     }
   }
 
-  while (true) {
-    bool found_complex = false;
+  while (found_complex) {
+    found_complex = false;
     for (std::size_t type = 0; type < types_n; type++) {
       tl_type *t = config.get_type_by_num(type);
       if (t->constructors_num == 0 || w.is_built_in_complex_type(t->name)) {  // built-in dummy or complex types
@@ -571,9 +575,6 @@ void write_tl(const tl_config &config, tl_outputer &out, const TL_writer &w) {
         found_complex = true;
         //  std::fprintf(stderr, "Found complex %s\n", t->name.c_str());
       }
-    }
-    if (!found_complex) {
-      break;
     }
   }
 

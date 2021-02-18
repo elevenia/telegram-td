@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,23 +16,22 @@ namespace td {
 // Should be just fine for small counters.
 class FloodControlStrict {
  public:
-  // there is no reason to return wakeup_at_, because it will be a time before the next allowed event, not current
-  void add_event(int32 now) {
+  int32 add_event(int32 now) {
     events_.push_back(Event{now});
     if (without_update_ > 0) {
       without_update_--;
     } else {
       update(now);
     }
+    return wakeup_at_;
   }
 
-  // no more than count in each duration
-  void add_limit(int32 duration, size_t count) {
+  // no more than count in each duration.
+  void add_limit(int32 duration, int32 count) {
     limits_.push_back(Limit{duration, count, 0});
-    without_update_ = 0;
   }
 
-  int32 get_wakeup_at() const {
+  int32 get_wakeup_at() {
     return wakeup_at_;
   }
 
@@ -42,7 +41,7 @@ class FloodControlStrict {
       limit.pos_ = 0;
     }
     without_update_ = 0;
-    wakeup_at_ = 1;
+    wakeup_at_ = 0;
   }
 
   int32 update(int32 now) {
@@ -50,7 +49,7 @@ class FloodControlStrict {
 
     without_update_ = std::numeric_limits<size_t>::max();
     for (auto &limit : limits_) {
-      if (limit.count_ < events_.size() - limit.pos_) {
+      if (limit.pos_ + limit.count_ < events_.size()) {
         limit.pos_ = events_.size() - limit.count_;
       }
 
@@ -64,7 +63,7 @@ class FloodControlStrict {
         wakeup_at_ = max(wakeup_at_, events_[limit.pos_].timestamp_ + limit.duration_);
         without_update_ = 0;
       } else {
-        without_update_ = min(without_update_, limit.count_ + limit.pos_ - events_.size() - 1);
+        without_update_ = min(without_update_, limit.count_ + limit.pos_ - events_.size());
       }
 
       min_pos = min(min_pos, limit.pos_);
@@ -80,13 +79,13 @@ class FloodControlStrict {
   }
 
  private:
-  int32 wakeup_at_ = 1;
+  int32 wakeup_at_ = 0;
   struct Event {
     int32 timestamp_;
   };
   struct Limit {
     int32 duration_;
-    size_t count_;
+    int32 count_;
     size_t pos_;
   };
   size_t without_update_ = 0;

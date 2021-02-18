@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -184,7 +184,7 @@ Result<FileLoader::PrefixInfo> FileUploader::on_update_local_location(const Loca
   }
 
   local_size_ = local_size;
-  if (expected_size_ < local_size_ && (expected_size_ != (10 << 20) || local_size_ >= (30 << 20))) {
+  if (expected_size_ < local_size_) {
     expected_size_ = local_size_;
   }
   local_is_ready_ = local_is_ready;
@@ -277,10 +277,12 @@ Result<std::pair<NetQueryPtr, bool>> FileUploader::start_part(Part part, int32 p
   if (big_flag_) {
     auto query =
         telegram_api::upload_saveBigFilePart(file_id_, part.id, local_is_ready_ ? part_count : -1, std::move(bytes));
-    net_query = G()->net_query_creator().create(query, DcId::main(), NetQuery::Type::Upload);
+    net_query = G()->net_query_creator().create(create_storer(query), DcId::main(), NetQuery::Type::Upload,
+                                                NetQuery::AuthFlag::On, NetQuery::GzipFlag::Off);
   } else {
     auto query = telegram_api::upload_saveFilePart(file_id_, part.id, std::move(bytes));
-    net_query = G()->net_query_creator().create(query, DcId::main(), NetQuery::Type::Upload);
+    net_query = G()->net_query_creator().create(create_storer(query), DcId::main(), NetQuery::Type::Upload,
+                                                NetQuery::AuthFlag::On, NetQuery::GzipFlag::Off);
   }
   net_query->file_type_ = narrow_cast<int32>(file_type_);
   return std::make_pair(std::move(net_query), false);

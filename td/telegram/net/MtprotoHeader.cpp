@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,12 +8,10 @@
 
 #include "td/telegram/JsonValue.h"
 #include "td/telegram/LanguagePackManager.h"
-#include "td/telegram/telegram_api.h"
 #include "td/telegram/Version.h"
 
 #include "td/tl/tl_object_store.h"
 
-#include "td/utils/port/Clocks.h"
 #include "td/utils/tl_helpers.h"
 
 namespace td {
@@ -39,7 +37,7 @@ class HeaderStorer {
     if (have_proxy) {
       flags |= 1 << 0;
     }
-    if (!is_anonymous) {
+    if (!options.parameters.empty()) {
       flags |= 1 << 1;
     }
     if (options.is_emulator) {
@@ -74,29 +72,10 @@ class HeaderStorer {
       store(Slice(options.proxy.server()), storer);
       store(options.proxy.port(), storer);
     }
-    if (!is_anonymous) {
-      telegram_api::object_ptr<telegram_api::JSONValue> json_value;
-      if (options.parameters.empty()) {
-        json_value = make_tl_object<telegram_api::jsonObject>(vector<tl_object_ptr<telegram_api::jsonObjectValue>>());
-      } else {
-        auto parameters_copy = options.parameters;
-        json_value = get_input_json_value(parameters_copy).move_as_ok();
-      }
+    if (!options.parameters.empty()) {
+      auto parameters_copy = options.parameters;
+      auto json_value = get_input_json_value(parameters_copy).move_as_ok();
       CHECK(json_value != nullptr);
-      if (json_value->get_id() == telegram_api::jsonObject::ID) {
-        auto &values = static_cast<telegram_api::jsonObject *>(json_value.get())->value_;
-        bool has_tz_offset = false;
-        for (auto &value : values) {
-          if (value->key_ == "tz_offset") {
-            has_tz_offset = true;
-            break;
-          }
-        }
-        if (!has_tz_offset) {
-          values.push_back(make_tl_object<telegram_api::jsonObjectValue>(
-              "tz_offset", make_tl_object<telegram_api::jsonNumber>(Clocks::tz_offset())));
-        }
-      }
       TlStoreBoxedUnknown<TlStoreObject>::store(json_value, storer);
     }
   }

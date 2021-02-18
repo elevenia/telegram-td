@@ -53,7 +53,7 @@ abstract class TlDocumentationGenerator
                 }
             }
             if ($bracket_count === 0) {
-                if (ord('A') <= ord($str[$pos + 1]) && ord($str[$pos + 1]) <= ord('Z')) {
+                if (ctype_upper($str[$pos + 1])) {
                     return substr($str, 0, -1).'.)';
                 }
             } else {
@@ -136,9 +136,6 @@ abstract class TlDocumentationGenerator
                     $this->printError('Wrong description begin');
                 }
 
-                if (preg_match('/[^ ]@/', $description)) {
-                    $this->printError("Wrong documentation '@' usage: $description");
-                }
                 $docs = explode('@', $description);
                 array_shift($docs);
                 $info = array();

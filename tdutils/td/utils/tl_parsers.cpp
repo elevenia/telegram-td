@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -39,17 +39,15 @@ void TlParser::set_error(const string &error_message) {
     left_len = 0;
     data_len = 0;
   } else {
-    LOG_CHECK(error_pos != std::numeric_limits<size_t>::max() && data_len == 0 && left_len == 0)
-        << data_len << " " << left_len << " " << data << " " << &empty_data[0] << " " << error_pos << " " << error
-        << " " << data << " " << &empty_data;
     data = empty_data;
+    CHECK(error_pos != std::numeric_limits<size_t>::max());
+    LOG_CHECK(data_len == 0) << data_len << " " << left_len << " " << data << " " << &empty_data[0] << " " << error_pos
+                             << " " << error;
+    CHECK(left_len == 0);
   }
 }
 
 BufferSlice TlBufferParser::as_buffer_slice(Slice slice) {
-  if (slice.empty()) {
-    return BufferSlice();
-  }
   if (is_aligned_pointer<4>(slice.data())) {
     return parent_->from_slice(slice);
   }

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -47,11 +47,9 @@ class WebPagesManager : public Actor {
 
   void on_get_web_page_by_url(const string &url, WebPageId web_page_id, bool from_database);
 
-  void on_get_web_page_instant_view_view_count(WebPageId web_page_id, int32 view_count);
+  void register_web_page(WebPageId web_page_id, FullMessageId full_message_id);
 
-  void register_web_page(WebPageId web_page_id, FullMessageId full_message_id, const char *source);
-
-  void unregister_web_page(WebPageId web_page_id, FullMessageId full_message_id, const char *source);
+  void unregister_web_page(WebPageId web_page_id, FullMessageId full_message_id);
 
   bool have_web_page(WebPageId web_page_id) const;
 

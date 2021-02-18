@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -27,7 +27,6 @@
 
 #include "td/db/SqliteKeyValueAsync.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
 #include "td/utils/format.h"
@@ -52,7 +51,8 @@ class GetBackgroundQuery : public Td::ResultHandler {
     background_id_ = background_id;
     background_name_ = background_name;
     LOG(INFO) << "Load " << background_id_ << "/" << background_name_ << " from server: " << to_string(input_wallpaper);
-    send_query(G()->net_query_creator().create(telegram_api::account_getWallPaper(std::move(input_wallpaper))));
+    send_query(
+        G()->net_query_creator().create(create_storer(telegram_api::account_getWallPaper(std::move(input_wallpaper)))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -67,8 +67,7 @@ class GetBackgroundQuery : public Td::ResultHandler {
   }
 
   void on_error(uint64 id, Status status) override {
-    LOG(INFO) << "Receive error for GetBackgroundQuery for " << background_id_ << "/" << background_name_ << ": "
-              << status;
+    LOG(INFO) << "Receive error for getBackground " << background_id_ << "/" << background_name_ << ": " << status;
     promise_.set_error(std::move(status));
   }
 };
@@ -82,7 +81,7 @@ class GetBackgroundsQuery : public Td::ResultHandler {
   }
 
   void send() {
-    send_query(G()->net_query_creator().create(telegram_api::account_getWallPapers(0)));
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::account_getWallPapers(0))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -107,9 +106,9 @@ class InstallBackgroundQuery : public Td::ResultHandler {
   }
 
   void send(BackgroundId background_id, int64 access_hash, const BackgroundType &type) {
-    send_query(G()->net_query_creator().create(telegram_api::account_installWallPaper(
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::account_installWallPaper(
         telegram_api::make_object<telegram_api::inputWallPaper>(background_id.get(), access_hash),
-        get_input_wallpaper_settings(type))));
+        get_input_wallpaper_settings(type)))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -144,8 +143,8 @@ class UploadBackgroundQuery : public Td::ResultHandler {
     type_ = type;
     for_dark_theme_ = for_dark_theme;
     string mime_type = type.type == BackgroundType::Type::Pattern ? "image/png" : "image/jpeg";
-    send_query(G()->net_query_creator().create(
-        telegram_api::account_uploadWallPaper(std::move(input_file), mime_type, get_input_wallpaper_settings(type))));
+    send_query(G()->net_query_creator().create(create_storer(
+        telegram_api::account_uploadWallPaper(std::move(input_file), mime_type, get_input_wallpaper_settings(type)))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -182,9 +181,9 @@ class SaveBackgroundQuery : public Td::ResultHandler {
   }
 
   void send(BackgroundId background_id, int64 access_hash, const BackgroundType &type, bool unsave) {
-    send_query(G()->net_query_creator().create(telegram_api::account_saveWallPaper(
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::account_saveWallPaper(
         telegram_api::make_object<telegram_api::inputWallPaper>(background_id.get(), access_hash), unsave,
-        get_input_wallpaper_settings(type))));
+        get_input_wallpaper_settings(type)))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -199,7 +198,7 @@ class SaveBackgroundQuery : public Td::ResultHandler {
   }
 
   void on_error(uint64 id, Status status) override {
-    if (!G()->is_expected_error(status)) {
+    if (!G()->close_flag()) {
       LOG(ERROR) << "Receive error for save background: " << status;
     }
     promise_.set_error(std::move(status));
@@ -214,7 +213,7 @@ class ResetBackgroundsQuery : public Td::ResultHandler {
   }
 
   void send() {
-    send_query(G()->net_query_creator().create(telegram_api::account_resetWallPapers()));
+    send_query(G()->net_query_creator().create(create_storer(telegram_api::account_resetWallPapers())));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -229,7 +228,7 @@ class ResetBackgroundsQuery : public Td::ResultHandler {
   }
 
   void on_error(uint64 id, Status status) override {
-    if (!G()->is_expected_error(status)) {
+    if (!G()->close_flag()) {
       LOG(ERROR) << "Receive error for reset backgrounds: " << status;
     }
     promise_.set_error(std::move(status));
@@ -320,22 +319,22 @@ class BackgroundManager::BackgroundLogEvent {
 void BackgroundManager::start_up() {
   for (int i = 0; i < 2; i++) {
     bool for_dark_theme = i != 0;
-    auto log_event_string = G()->td_db()->get_binlog_pmc()->get(get_background_database_key(for_dark_theme));
-    if (!log_event_string.empty()) {
-      BackgroundLogEvent log_event;
-      log_event_parse(log_event, log_event_string).ensure();
+    auto logevent_string = G()->td_db()->get_binlog_pmc()->get(get_background_database_key(for_dark_theme));
+    if (!logevent_string.empty()) {
+      BackgroundLogEvent logevent;
+      log_event_parse(logevent, logevent_string).ensure();
 
-      CHECK(log_event.background_.id.is_valid());
-      bool needs_file_id = log_event.background_.type.type != BackgroundType::Type::Fill;
-      if (log_event.background_.file_id.is_valid() != needs_file_id) {
-        LOG(ERROR) << "Failed to load " << log_event.background_.id << " of " << log_event.background_.type;
+      CHECK(logevent.background_.id.is_valid());
+      bool needs_file_id = logevent.background_.type.type != BackgroundType::Type::Fill;
+      if (logevent.background_.file_id.is_valid() != needs_file_id) {
+        LOG(ERROR) << "Failed to load " << logevent.background_.id << " of " << logevent.background_.type;
         G()->td_db()->get_binlog_pmc()->erase(get_background_database_key(for_dark_theme));
         continue;
       }
-      set_background_id_[for_dark_theme] = log_event.background_.id;
-      set_background_type_[for_dark_theme] = log_event.set_type_;
+      set_background_id_[for_dark_theme] = logevent.background_.id;
+      set_background_type_[for_dark_theme] = logevent.set_type_;
 
-      add_background(log_event.background_);
+      add_background(logevent.background_);
     }
 
     send_update_selected_background(for_dark_theme);
@@ -475,10 +474,6 @@ BackgroundId BackgroundManager::search_background(const string &name, Promise<Un
 }
 
 void BackgroundManager::on_load_background_from_database(string name, string value) {
-  if (G()->close_flag()) {
-    return;
-  }
-
   auto promises_it = being_loaded_from_database_backgrounds_.find(name);
   CHECK(promises_it != being_loaded_from_database_backgrounds_.end());
   auto promises = std::move(promises_it->second);
@@ -664,8 +659,8 @@ void BackgroundManager::save_background_id(bool for_dark_theme) const {
   if (background_id.is_valid()) {
     const Background *background = get_background(background_id);
     CHECK(background != nullptr);
-    BackgroundLogEvent log_event{*background, set_background_type_[for_dark_theme]};
-    G()->td_db()->get_binlog_pmc()->set(key, log_event_store(log_event).as_slice().str());
+    BackgroundLogEvent logevent{*background, set_background_type_[for_dark_theme]};
+    G()->td_db()->get_binlog_pmc()->set(key, log_event_store(logevent).as_slice().str());
   } else {
     G()->td_db()->get_binlog_pmc()->erase(key);
   }
@@ -1056,8 +1051,7 @@ td_api::object_ptr<td_api::background> BackgroundManager::get_background_object(
   }
   return td_api::make_object<td_api::background>(
       background->id.get(), background->is_default, background->is_dark, background->name,
-      td_->documents_manager_->get_document_object(background->file_id, PhotoFormat::Png),
-      get_background_type_object(*type));
+      td_->documents_manager_->get_document_object(background->file_id), get_background_type_object(*type));
 }
 
 td_api::object_ptr<td_api::backgrounds> BackgroundManager::get_backgrounds_object(bool for_dark_theme) const {

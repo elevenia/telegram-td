@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -102,7 +102,7 @@ void SessionProxy::start_up() {
    private:
     ActorShared<SessionProxy> session_proxy_;
   };
-  auth_key_state_ = auth_data_->get_auth_key_state();
+  auth_key_state_ = auth_data_->get_auth_key_state().first;
   auth_data_->add_auth_key_listener(make_unique<Listener>(actor_shared(this)));
   open_session();
 }
@@ -138,10 +138,6 @@ void SessionProxy::update_main_flag(bool is_main) {
 }
 
 void SessionProxy::update_destroy(bool need_destroy) {
-  if (need_destroy_ == need_destroy) {
-    LOG(INFO) << "Ignore reduntant update_destroy(" << need_destroy << ")";
-    return;
-  }
   need_destroy_ = need_destroy;
   close_session();
   open_session();
@@ -175,7 +171,7 @@ void SessionProxy::open_session(bool force) {
   // 1. All unauthorized query will be sent into the same SessionProxy
   // 2. All authorized query are delayed before we have authorization
   // So only one SessionProxy will be active before we have authorization key
-  auto should_open = [&] {
+  auto should_open = [&]() {
     if (force) {
       return true;
     }
@@ -212,7 +208,7 @@ void SessionProxy::open_session(bool force) {
 
 void SessionProxy::update_auth_key_state() {
   auto old_auth_key_state = auth_key_state_;
-  auth_key_state_ = auth_data_->get_auth_key_state();
+  auth_key_state_ = auth_data_->get_auth_key_state().first;
   if (auth_key_state_ != old_auth_key_state && old_auth_key_state == AuthKeyState::OK) {
     close_session();
   }

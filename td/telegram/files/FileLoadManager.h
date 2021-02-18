@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -58,7 +58,8 @@ class FileLoadManager final : public Actor {
   void from_bytes(QueryId id, FileType type, BufferSlice bytes, string name);
   void cancel(QueryId id);
   void update_local_file_location(QueryId id, const LocalFileLocation &local);
-  void update_downloaded_part(QueryId id, int64 offset, int64 limit);
+  void update_download_offset(QueryId id, int64 offset);
+  void update_download_limit(QueryId id, int64 limit);
   void get_content(const FullLocalFileLocation &local_location, Promise<BufferSlice> promise);
 
  private:

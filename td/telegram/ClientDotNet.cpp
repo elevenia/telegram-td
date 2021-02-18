@@ -1,20 +1,16 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
-#pragma managed(push, off)
 #include "td/telegram/Client.h"
-#pragma managed(pop)
 
 #include "td/telegram/TdDotNetApi.h"
 
 #include "td/utils/port/CxCli.h"
 
-#pragma managed(push, off)
 #include <cstdint>
-#pragma managed(pop)
 
 namespace Telegram {
 namespace Td {
@@ -77,6 +73,14 @@ public:
   }
 
   /// <summary>
+  /// Replaces handler for incoming updates from the TDLib.
+  /// </summary>
+  /// <param name="updatesHandler">Handler with OnResult method which will be called for every incoming update from the TDLib.</param>
+  void SetUpdatesHandler(ClientResultHandler^ updatesHandler) {
+    handlers[0] = updatesHandler;
+  }
+
+  /// <summary>
   /// Launches a cycle which will fetch all results of queries to TDLib and incoming updates from TDLib.
   /// Must be called once on a separate dedicated thread, on which all updates and query results will be handled.
   /// Returns only when TDLib instance is closed.
@@ -99,16 +103,16 @@ public:
   /// <summary>
   /// Creates new Client.
   /// </summary>
-  /// <param name="updateHandler">Handler for incoming updates.</param>
+  /// <param name="updatesHandler">Handler for incoming updates.</param>
   /// <returns>Returns created Client.</returns>
-  static Client^ Create(ClientResultHandler^ updateHandler) {
-    return REF_NEW Client(updateHandler);
+  static Client^ Create(ClientResultHandler^ updatesHandler) {
+    return REF_NEW Client(updatesHandler);
   }
 
 private:
-  Client(ClientResultHandler^ updateHandler) {
+  Client(ClientResultHandler^ updatesHandler) {
     client = new td::Client();
-    handlers[0] = updateHandler;
+    handlers[0] = updatesHandler;
   }
 
   ~Client() {

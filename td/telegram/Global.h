@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -38,7 +38,6 @@ class ConnectionCreator;
 class ContactsManager;
 class FileManager;
 class FileReferenceManager;
-class GroupCallManager;
 class LanguagePackManager;
 class MessagesManager;
 class MtprotoHeader;
@@ -103,10 +102,9 @@ class Global : public ActorContext {
   bool ignore_backgrond_updates() const;
 
   NetQueryCreator &net_query_creator() {
-    return *net_query_creator_.get();
+    return net_query_creator_.get();
   }
 
-  void set_net_query_stats(std::shared_ptr<NetQueryStats> net_query_stats);
   void set_net_query_dispatcher(unique_ptr<NetQueryDispatcher> net_query_dispatcher);
 
   NetQueryDispatcher &net_query_dispatcher() {
@@ -115,13 +113,13 @@ class Global : public ActorContext {
   }
 
   bool have_net_query_dispatcher() const {
-    return net_query_dispatcher_.get() != nullptr;
+    return net_query_dispatcher_ != nullptr;
   }
 
   void set_shared_config(unique_ptr<ConfigShared> shared_config);
 
   ConfigShared &shared_config() {
-    CHECK(shared_config_.get() != nullptr);
+    CHECK(shared_config_ != nullptr);
     return *shared_config_;
   }
 
@@ -214,13 +212,6 @@ class Global : public ActorContext {
   }
   void set_file_reference_manager(ActorId<FileReferenceManager> file_reference_manager) {
     file_reference_manager_ = std::move(file_reference_manager);
-  }
-
-  ActorId<GroupCallManager> group_call_manager() const {
-    return group_call_manager_;
-  }
-  void set_group_call_manager(ActorId<GroupCallManager> group_call_manager) {
-    group_call_manager_ = group_call_manager;
   }
 
   ActorId<LanguagePackManager> language_pack_manager() const {
@@ -352,19 +343,6 @@ class Global : public ActorContext {
     return close_flag_.load();
   }
 
-  bool is_expected_error(const Status &error) const {
-    CHECK(error.is_error());
-    if (error.code() == 401) {
-      // authorization is lost
-      return true;
-    }
-    if (error.code() == 420 || error.code() == 429) {
-      // flood wait
-      return true;
-    }
-    return close_flag();
-  }
-
   const std::vector<std::shared_ptr<NetStatsCallback>> &get_net_stats_file_callbacks() {
     return net_stats_file_callbacks_;
   }
@@ -393,7 +371,6 @@ class Global : public ActorContext {
   ActorId<ContactsManager> contacts_manager_;
   ActorId<FileManager> file_manager_;
   ActorId<FileReferenceManager> file_reference_manager_;
-  ActorId<GroupCallManager> group_call_manager_;
   ActorId<LanguagePackManager> language_pack_manager_;
   ActorId<MessagesManager> messages_manager_;
   ActorId<NotificationManager> notification_manager_;
@@ -421,8 +398,6 @@ class Global : public ActorContext {
   std::atomic<bool> dns_time_difference_was_updated_{false};
   std::atomic<bool> close_flag_{false};
   std::atomic<double> system_time_saved_at_{-1e10};
-  double saved_diff_ = 0.0;
-  double saved_system_time_ = 0.0;
 
 #if !TD_HAVE_ATOMIC_SHARED_PTR
   std::mutex dh_config_mutex_;
@@ -432,7 +407,7 @@ class Global : public ActorContext {
 
   ActorId<StateManager> state_manager_;
 
-  LazySchedulerLocalStorage<unique_ptr<NetQueryCreator>> net_query_creator_;
+  SchedulerLocalStorage<NetQueryCreator> net_query_creator_;
   unique_ptr<NetQueryDispatcher> net_query_dispatcher_;
 
   unique_ptr<ConfigShared> shared_config_;
@@ -443,7 +418,7 @@ class Global : public ActorContext {
 
   std::unordered_map<int64, int64> location_access_hashes_;
 
-  int32 to_unix_time(double server_time) const;
+  static int32 to_unix_time(double server_time);
 
   void do_save_server_time_difference();
 
@@ -458,7 +433,5 @@ inline Global *G_impl(const char *file, int line) {
   LOG_CHECK(context->get_id() == Global::ID) << "In " << file << " at " << line;
   return static_cast<Global *>(context);
 }
-
-double get_global_server_time();
 
 }  // namespace td

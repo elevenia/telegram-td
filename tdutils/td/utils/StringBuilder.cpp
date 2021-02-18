@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -22,14 +22,14 @@ namespace td {
 
 StringBuilder::StringBuilder(MutableSlice slice, bool use_buffer)
     : begin_ptr_(slice.begin()), current_ptr_(begin_ptr_), use_buffer_(use_buffer) {
-  if (slice.size() <= RESERVED_SIZE) {
-    auto buffer_size = RESERVED_SIZE + 100;
+  if (slice.size() <= reserved_size) {
+    auto buffer_size = reserved_size + 100;
     buffer_ = std::make_unique<char[]>(buffer_size);
     begin_ptr_ = buffer_.get();
     current_ptr_ = begin_ptr_;
-    end_ptr_ = begin_ptr_ + buffer_size - RESERVED_SIZE;
+    end_ptr_ = begin_ptr_ + buffer_size - reserved_size;
   } else {
-    end_ptr_ = slice.end() - RESERVED_SIZE;
+    end_ptr_ = slice.end() - reserved_size;
   }
 }
 
@@ -39,7 +39,7 @@ StringBuilder &StringBuilder::operator<<(Slice slice) {
     if (end_ptr_ < current_ptr_) {
       return on_error();
     }
-    auto available_size = static_cast<size_t>(end_ptr_ + RESERVED_SIZE - 1 - current_ptr_);
+    auto available_size = static_cast<size_t>(end_ptr_ + reserved_size - 1 - current_ptr_);
     if (size > available_size) {
       error_flag_ = true;
       size = available_size;
@@ -81,10 +81,11 @@ template <class T>
 static char *print_int(char *current_ptr, T x) {
   if (x < 0) {
     if (x == std::numeric_limits<T>::min()) {
-      current_ptr = print_int(current_ptr, x + 1);
-      CHECK(current_ptr[-1] != '9');
-      current_ptr[-1]++;
-      return current_ptr;
+      std::stringstream ss;
+      ss << x;
+      auto len = narrow_cast<int>(static_cast<std::streamoff>(ss.tellp()));
+      ss.read(current_ptr, len);
+      return current_ptr + len;
     }
 
     *current_ptr++ = '-';
@@ -100,12 +101,12 @@ bool StringBuilder::reserve_inner(size_t size) {
   }
 
   size_t old_data_size = current_ptr_ - begin_ptr_;
-  if (size >= std::numeric_limits<size_t>::max() - RESERVED_SIZE - old_data_size - 1) {
+  if (size >= std::numeric_limits<size_t>::max() - reserved_size - old_data_size - 1) {
     return false;
   }
   size_t need_data_size = old_data_size + size;
   size_t old_buffer_size = end_ptr_ - begin_ptr_;
-  if (old_buffer_size >= (std::numeric_limits<size_t>::max() - RESERVED_SIZE) / 2 - 2) {
+  if (old_buffer_size >= (std::numeric_limits<size_t>::max() - reserved_size) / 2 - 2) {
     return false;
   }
   size_t new_buffer_size = (old_buffer_size + 1) * 2;
@@ -115,13 +116,13 @@ bool StringBuilder::reserve_inner(size_t size) {
   if (new_buffer_size < 100) {
     new_buffer_size = 100;
   }
-  new_buffer_size += RESERVED_SIZE;
+  new_buffer_size += reserved_size;
   auto new_buffer = std::make_unique<char[]>(new_buffer_size);
   std::memcpy(new_buffer.get(), begin_ptr_, old_data_size);
   buffer_ = std::move(new_buffer);
   begin_ptr_ = buffer_.get();
   current_ptr_ = begin_ptr_ + old_data_size;
-  end_ptr_ = begin_ptr_ + new_buffer_size - RESERVED_SIZE;
+  end_ptr_ = begin_ptr_ + new_buffer_size - reserved_size;
   CHECK(end_ptr_ > current_ptr_);
   CHECK(static_cast<size_t>(end_ptr_ - current_ptr_) >= size);
   return true;
@@ -192,7 +193,7 @@ StringBuilder &StringBuilder::operator<<(FixedDouble x) {
   *ss << x.d;
 
   int len = narrow_cast<int>(static_cast<std::streamoff>(ss->tellp()));
-  auto left = end_ptr_ + RESERVED_SIZE - current_ptr_;
+  auto left = end_ptr_ + reserved_size - current_ptr_;
   if (unlikely(len >= left)) {
     error_flag_ = true;
     len = left ? narrow_cast<int>(left - 1) : 0;
@@ -206,7 +207,7 @@ StringBuilder &StringBuilder::operator<<(const void *ptr) {
   if (unlikely(!reserve())) {
     return on_error();
   }
-  current_ptr_ += std::snprintf(current_ptr_, RESERVED_SIZE, "%p", ptr);
+  current_ptr_ += std::snprintf(current_ptr_, reserved_size, "%p", ptr);
   return *this;
 }
 

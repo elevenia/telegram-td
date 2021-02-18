@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,30 +8,27 @@
 
 #include "td/telegram/net/DcId.h"
 #include "td/telegram/net/NetQueryCounter.h"
-#include "td/telegram/net/NetQueryStats.h"
 
 #include "td/actor/actor.h"
 #include "td/actor/PromiseFuture.h"
 #include "td/actor/SignalSlot.h"
 
+#include "td/mtproto/utils.h"  // for create_storer, fetch_result TODO
+
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
 #include "td/utils/format.h"
+#include "td/utils/List.h"
 #include "td/utils/logging.h"
 #include "td/utils/ObjectPool.h"
-#include "td/utils/Slice.h"
 #include "td/utils/Status.h"
 #include "td/utils/StringBuilder.h"
 #include "td/utils/Time.h"
-#include "td/utils/tl_parsers.h"
-#include "td/utils/TsList.h"
 
 #include <atomic>
 #include <utility>
 
 namespace td {
-
-extern int VERBOSITY_NAME(net_query);
 
 class NetQuery;
 using NetQueryPtr = ObjectPool<NetQuery>::OwnerPtr;
@@ -43,7 +40,9 @@ class NetQueryCallback : public Actor {
   virtual void on_result_resendable(NetQueryPtr query, Promise<NetQueryPtr> promise);
 };
 
-class NetQuery : public TsListNode<NetQueryDebug> {
+extern ListNode net_query_list_;
+
+class NetQuery : public ListNode {
  public:
   NetQuery() = default;
 
@@ -79,10 +78,7 @@ class NetQuery : public TsListNode<NetQueryDebug> {
 
   void resend(DcId new_dc_id) {
     VLOG(net_query) << "Resend" << *this;
-    {
-      auto guard = lock();
-      get_data_unsafe().resend_count_++;
-    }
+    debug_resend_cnt_++;
     dc_id_ = new_dc_id;
     status_ = Status::OK();
     state_ = State::Query;
@@ -137,7 +133,7 @@ class NetQuery : public TsListNode<NetQueryDebug> {
   void on_net_write(size_t size);
   void on_net_read(size_t size);
 
-  void set_error(Status status, string source = string());
+  void set_error(Status status, string source = "");
 
   void set_error_resend() {
     set_error_impl(Status::Error<Error::Resend>());
@@ -217,16 +213,13 @@ class NetQuery : public TsListNode<NetQueryDebug> {
   }
 
   void clear() {
-    if (!is_ready()) {
-      auto guard = lock();
-      LOG(ERROR) << "Destroy not ready query " << *this << " " << tag("state", get_data_unsafe().state_);
-    }
+    LOG_IF(ERROR, !is_ready()) << "Destroy not ready query " << *this << " " << tag("debug", debug_str_);
     // TODO: CHECK if net_query is lost here
     cancel_slot_.close();
     *this = NetQuery();
   }
   bool empty() const {
-    return state_ == State::Empty || !nq_counter_ || may_be_lost_;
+    return state_ == State::Empty || nq_counter_.empty() || may_be_lost_;
   }
 
   void stop_track() {
@@ -235,20 +228,15 @@ class NetQuery : public TsListNode<NetQueryDebug> {
   }
 
   void debug_send_failed() {
-    auto guard = lock();
-    get_data_unsafe().send_failed_count_++;
+    debug_send_failed_cnt_++;
   }
 
-  void debug(string state, bool may_be_lost = false) {
+  void debug(string str, bool may_be_lost = false) {
     may_be_lost_ = may_be_lost;
-    VLOG(net_query) << *this << " " << tag("state", state);
-    {
-      auto guard = lock();
-      auto &data = get_data_unsafe();
-      data.state_ = std::move(state);
-      data.state_timestamp_ = Time::now();
-      data.state_change_count_++;
-    }
+    debug_str_ = std::move(str);
+    debug_timestamp_ = Time::now();
+    debug_cnt_++;
+    VLOG(net_query) << *this << " " << tag("debug", debug_str_);
   }
 
   void set_callback(ActorShared<NetQueryCallback> callback) {
@@ -268,12 +256,7 @@ class NetQuery : public TsListNode<NetQueryDebug> {
     finish_migrate(cancel_slot_);
   }
 
-  int8 priority() const {
-    return priority_;
-  }
-  void set_priority(int8 priority) {
-    priority_ = priority;
-  }
+  static int32 tl_magic(const BufferSlice &buffer_slice);
 
  private:
   State state_ = State::Empty;
@@ -282,7 +265,6 @@ class NetQuery : public TsListNode<NetQueryDebug> {
   GzipFlag gzip_flag_ = GzipFlag::Off;
   DcId dc_id_;
 
-  NetQueryCounter nq_counter_;
   Status status_;
   uint64 id_ = 0;
   BufferSlice query_;
@@ -291,10 +273,6 @@ class NetQuery : public TsListNode<NetQueryDebug> {
 
   NetQueryRef invoke_after_;
   uint32 session_rand_ = 0;
-
-  bool may_be_lost_ = false;
-  int8 priority_{0};
-
   template <class T>
   struct movable_atomic : public std::atomic<T> {
     movable_atomic() = default;
@@ -312,37 +290,47 @@ class NetQuery : public TsListNode<NetQueryDebug> {
     ~movable_atomic() = default;
   };
 
+  static int32 get_my_id();
+
   movable_atomic<uint64> session_id_{0};
   uint64 message_id_{0};
 
   movable_atomic<int32> cancellation_token_{-1};  // == 0 if query is canceled
   ActorShared<NetQueryCallback> callback_;
 
-  void set_error_impl(Status status, string source = string()) {
+  void set_error_impl(Status status, string source = "") {
     VLOG(net_query) << "Got error " << *this << " " << status;
     status_ = std::move(status);
     state_ = State::Error;
     source_ = std::move(source);
   }
 
-  static int32 get_my_id();
-
-  static int32 tl_magic(const BufferSlice &buffer_slice);
-
  public:
-  double next_timeout_ = 1;          // for NetQueryDelayer
-  double total_timeout_ = 0;         // for NetQueryDelayer/SequenceDispatcher
-  double total_timeout_limit_ = 60;  // for NetQueryDelayer/SequenceDispatcher and to be set by caller
-  double last_timeout_ = 0;          // for NetQueryDelayer/SequenceDispatcher
-  string source_;                    // for NetQueryDelayer/SequenceDispatcher
-  bool need_resend_on_503_ = true;   // for NetQueryDispatcher and to be set by caller
-  int32 dispatch_ttl_ = -1;          // for NetQueryDispatcher and to be set by caller
-  Slot cancel_slot_;                 // for Session and to be set by caller
-  Promise<> quick_ack_promise_;      // for Session and to be set by caller
-  int32 file_type_ = -1;             // to be set by caller
+  double next_timeout = 1;
+  double total_timeout = 0;
+  double total_timeout_limit = 60;
+  double last_timeout = 0;
+  bool need_resend_on_503 = true;
+  bool may_be_lost_ = false;
+  string debug_str_ = "empty";
+  string source_;
+  double debug_timestamp_ = 0;
+  int32 debug_cnt_ = 0;
+  int32 debug_send_failed_cnt_ = 0;
+  int32 debug_resend_cnt_ = 0;
+  int debug_ack = 0;
+  bool debug_unknown = false;
+  int32 dispatch_ttl = -1;
+  Slot cancel_slot_;
+  Promise<> quick_ack_promise_;
+  int32 file_type_ = -1;
+
+  double start_timestamp_ = 0;
+  int32 my_id_ = 0;
+  NetQueryCounter nq_counter_;
 
   NetQuery(State state, uint64 id, BufferSlice &&query, BufferSlice &&answer, DcId dc_id, Type type, AuthFlag auth_flag,
-           GzipFlag gzip_flag, int32 tl_constructor, double total_timeout_limit, NetQueryStats *stats)
+           GzipFlag gzip_flag, int32 tl_constructor)
       : state_(state)
       , type_(type)
       , auth_flag_(auth_flag)
@@ -353,14 +341,11 @@ class NetQuery : public TsListNode<NetQueryDebug> {
       , query_(std::move(query))
       , answer_(std::move(answer))
       , tl_constructor_(tl_constructor)
-      , total_timeout_limit_(total_timeout_limit) {
-    auto &data = get_data_unsafe();
-    data.my_id_ = get_my_id();
-    data.start_timestamp_ = data.state_timestamp_ = Time::now();
+      , nq_counter_(true) {
+    my_id_ = get_my_id();
+    start_timestamp_ = Time::now();
     LOG(INFO) << *this;
-    if (stats) {
-      nq_counter_ = stats->register_query(this);
-    }
+    // net_query_list_.put(this);
   }
 };
 
@@ -380,7 +365,6 @@ inline StringBuilder &operator<<(StringBuilder &stream, const NetQuery &net_quer
   stream << "]";
   return stream;
 }
-
 inline StringBuilder &operator<<(StringBuilder &stream, const NetQueryPtr &net_query_ptr) {
   return stream << *net_query_ptr;
 }
@@ -392,21 +376,6 @@ inline void cancel_query(NetQueryRef &ref) {
     return;
   }
   ref->cancel(ref.generation());
-}
-
-template <class T>
-Result<typename T::ReturnType> fetch_result(const BufferSlice &message) {
-  TlBufferParser parser(&message);
-  auto result = T::fetch_result(parser);
-  parser.fetch_end();
-
-  const char *error = parser.get_error();
-  if (error != nullptr) {
-    LOG(ERROR) << "Can't parse: " << format::as_hex_dump<4>(message.as_slice());
-    return Status::Error(500, Slice(error));
-  }
-
-  return std::move(result);
 }
 
 template <class T>
@@ -428,7 +397,6 @@ Result<typename T::ReturnType> fetch_result(Result<NetQueryPtr> r_query) {
 inline void NetQueryCallback::on_result(NetQueryPtr query) {
   on_result_resendable(std::move(query), Auto());
 }
-
 inline void NetQueryCallback::on_result_resendable(NetQueryPtr query, Promise<NetQueryPtr> promise) {
   on_result(std::move(query));
 }
@@ -436,7 +404,6 @@ inline void NetQueryCallback::on_result_resendable(NetQueryPtr query, Promise<Ne
 inline void start_migrate(NetQueryPtr &net_query, int32 sched_id) {
   net_query->start_migrate(sched_id);
 }
-
 inline void finish_migrate(NetQueryPtr &net_query) {
   net_query->finish_migrate();
 }

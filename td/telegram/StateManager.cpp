@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -9,8 +9,8 @@
 #include "td/actor/PromiseFuture.h"
 #include "td/actor/SleepActor.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/logging.h"
+#include "td/utils/misc.h"
 #include "td/utils/Time.h"
 
 namespace td {
@@ -78,14 +78,9 @@ void StateManager::on_proxy(bool use_proxy) {
   loop();
 }
 
-void StateManager::on_logging_out(bool is_logging_out) {
-  is_logging_out_ = is_logging_out;
-  notify_flag(Flag::LoggingOut);
-}
-
 void StateManager::add_callback(unique_ptr<Callback> callback) {
   if (callback->on_network(network_type_, network_generation_) && callback->on_online(online_flag_) &&
-      callback->on_state(get_real_state()) && callback->on_logging_out(is_logging_out_)) {
+      callback->on_state(get_real_state())) {
     callbacks_.push_back(std::move(callback));
   }
 }
@@ -126,8 +121,6 @@ void StateManager::notify_flag(Flag flag) {
           return (*it)->on_state(flush_state_);
         case Flag::Network:
           return (*it)->on_network(network_type_, network_generation_);
-        case Flag::LoggingOut:
-          return (*it)->on_logging_out(is_logging_out_);
         default:
           UNREACHABLE();
           return true;

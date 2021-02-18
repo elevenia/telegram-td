@@ -1,12 +1,11 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 #include "td/utils/logging.h"
 
-#include "td/utils/ExitGuard.h"
 #include "td/utils/port/Clocks.h"
 #include "td/utils/port/StdStreams.h"
 #include "td/utils/port/thread_local.h"
@@ -15,8 +14,6 @@
 
 #include <atomic>
 #include <cstdlib>
-#include <limits>
-#include <mutex>
 
 #if TD_ANDROID
 #include <android/log.h>
@@ -30,6 +27,16 @@
 
 namespace td {
 
+int VERBOSITY_NAME(net_query) = VERBOSITY_NAME(INFO);
+int VERBOSITY_NAME(td_requests) = VERBOSITY_NAME(INFO);
+int VERBOSITY_NAME(dc) = VERBOSITY_NAME(DEBUG) + 2;
+int VERBOSITY_NAME(files) = VERBOSITY_NAME(DEBUG) + 2;
+int VERBOSITY_NAME(mtproto) = VERBOSITY_NAME(DEBUG) + 7;
+int VERBOSITY_NAME(raw_mtproto) = VERBOSITY_NAME(DEBUG) + 10;
+int VERBOSITY_NAME(fd) = VERBOSITY_NAME(DEBUG) + 9;
+int VERBOSITY_NAME(actor) = VERBOSITY_NAME(DEBUG) + 10;
+int VERBOSITY_NAME(sqlite) = VERBOSITY_NAME(DEBUG) + 10;
+
 LogOptions log_options;
 
 TD_THREAD_LOCAL const char *Logger::tag_ = nullptr;
@@ -38,46 +45,27 @@ TD_THREAD_LOCAL const char *Logger::tag2_ = nullptr;
 Logger::Logger(LogInterface &log, const LogOptions &options, int log_level, Slice file_name, int line_num,
                Slice comment)
     : Logger(log, options, log_level) {
-  if (log_level == VERBOSITY_NAME(PLAIN) && &options == &log_options) {
-    return;
-  }
   if (!options_.add_info) {
-    return;
-  }
-  if (ExitGuard::is_exited()) {
     return;
   }
 
   // log level
   sb_ << '[';
-  if (static_cast<unsigned int>(log_level) < 10) {
-    sb_ << ' ' << static_cast<char>('0' + log_level);
-  } else {
-    sb_ << log_level;
+  if (log_level < 10) {
+    sb_ << ' ';
   }
-  sb_ << ']';
+  sb_ << log_level << ']';
 
   // thread id
   auto thread_id = get_thread_id();
   sb_ << "[t";
-  if (static_cast<unsigned int>(thread_id) < 10) {
-    sb_ << ' ' << static_cast<char>('0' + thread_id);
-  } else {
-    sb_ << thread_id;
+  if (thread_id < 10) {
+    sb_ << ' ';
   }
-  sb_ << ']';
+  sb_ << thread_id << ']';
 
   // timestamp
-  auto time = Clocks::system();
-  auto unix_time = static_cast<uint32>(time);
-  auto nanoseconds = static_cast<uint32>((time - unix_time) * 1e9);
-  sb_ << '[' << unix_time << '.';
-  uint32 limit = 100000000;
-  while (nanoseconds < limit && limit > 1) {
-    sb_ << '0';
-    limit /= 10;
-  }
-  sb_ << nanoseconds << ']';
+  sb_ << '[' << StringBuilder::FixedDouble(Clocks::system(), 9) << ']';
 
   // file : line
   if (!file_name.empty()) {
@@ -86,7 +74,7 @@ Logger::Logger(LogInterface &log, const LogOptions &options, int log_level, Slic
       last_slash_--;
     }
     file_name = file_name.substr(last_slash_ + 1);
-    sb_ << '[' << file_name << ':' << static_cast<unsigned int>(line_num) << ']';
+    sb_ << "[" << file_name << ':' << line_num << ']';
   }
 
   // context from tag_
@@ -108,9 +96,6 @@ Logger::Logger(LogInterface &log, const LogOptions &options, int log_level, Slic
 }
 
 Logger::~Logger() {
-  if (ExitGuard::is_exited()) {
-    return;
-  }
   if (options_.fix_newlines) {
     sb_ << '\n';
     auto slice = as_cslice();
@@ -159,7 +144,7 @@ TsCerr &TsCerr::operator<<(Slice slice) {
 }
 
 void TsCerr::enterCritical() {
-  while (lock_.test_and_set(std::memory_order_acquire) && !ExitGuard::is_exited()) {
+  while (lock_.test_and_set(std::memory_order_acquire)) {
     // spin
   }
 }
@@ -168,16 +153,6 @@ void TsCerr::exitCritical() {
   lock_.clear(std::memory_order_release);
 }
 TsCerr::Lock TsCerr::lock_ = ATOMIC_FLAG_INIT;
-
-void TsLog::enter_critical() {
-  while (lock_.test_and_set(std::memory_order_acquire) && !ExitGuard::is_exited()) {
-    // spin
-  }
-}
-
-void TsLog::exit_critical() {
-  lock_.clear(std::memory_order_release);
-}
 
 class DefaultLog : public LogInterface {
  public:
@@ -203,19 +178,19 @@ class DefaultLog : public LogInterface {
 #elif TD_TIZEN
     switch (log_level) {
       case VERBOSITY_NAME(FATAL):
-        dlog_print(DLOG_ERROR, DLOG_TAG, "%s", slice.c_str());
+        dlog_print(DLOG_ERROR, DLOG_TAG, slice.c_str());
         break;
       case VERBOSITY_NAME(ERROR):
-        dlog_print(DLOG_ERROR, DLOG_TAG, "%s", slice.c_str());
+        dlog_print(DLOG_ERROR, DLOG_TAG, slice.c_str());
         break;
       case VERBOSITY_NAME(WARNING):
-        dlog_print(DLOG_WARN, DLOG_TAG, "%s", slice.c_str());
+        dlog_print(DLOG_WARN, DLOG_TAG, slice.c_str());
         break;
       case VERBOSITY_NAME(INFO):
-        dlog_print(DLOG_INFO, DLOG_TAG, "%s", slice.c_str());
+        dlog_print(DLOG_INFO, DLOG_TAG, slice.c_str());
         break;
       default:
-        dlog_print(DLOG_DEBUG, DLOG_TAG, "%s", slice.c_str());
+        dlog_print(DLOG_DEBUG, DLOG_TAG, slice.c_str());
         break;
     }
 #elif TD_EMSCRIPTEN
@@ -284,29 +259,5 @@ void process_fatal_error(CSlice message) {
   }
   std::abort();
 }
-
-namespace {
-std::mutex sdl_mutex;
-int sdl_cnt = 0;
-int sdl_verbosity = 0;
-}  // namespace
-
-ScopedDisableLog::ScopedDisableLog() {
-  std::unique_lock<std::mutex> guard(sdl_mutex);
-  if (sdl_cnt == 0) {
-    sdl_verbosity = set_verbosity_level(std::numeric_limits<int>::min());
-  }
-  sdl_cnt++;
-}
-
-ScopedDisableLog::~ScopedDisableLog() {
-  std::unique_lock<std::mutex> guard(sdl_mutex);
-  sdl_cnt--;
-  if (sdl_cnt == 0) {
-    set_verbosity_level(sdl_verbosity);
-  }
-}
-
-static ExitGuard exit_guard;
 
 }  // namespace td

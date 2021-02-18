@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,40 +8,34 @@
 
 namespace td {
 
-constexpr int32 MTPROTO_LAYER = 123;
+constexpr int32 MTPROTO_LAYER = 109;
 
 enum class Version : int32 {
-  Initial,  // 0
+  Initial,
   StoreFileId,
   AddKeyHashToSecretChat,
   AddDurationToAnimation,
   FixStoreGameWithoutAnimation,
-  AddAccessHashToSecretChat,  // 5
+  AddAccessHashToSecretChat,
   StoreFileOwnerId,
   StoreFileEncryptionKey,
   NetStatsCountDuration,
   FixWebPageInstantViewDatabase,
-  FixMinUsers,  // 10
+  FixMinUsers,
   FixPageBlockAudioEmptyFile,
   AddMessageInvoiceProviderData,
   AddCaptionEntities,
   AddVenueType,
-  AddTermsOfService,  // 15
+  AddTermsOfService,
   AddContactVcard,
   AddMessageUnsupportedVersion,
   SupportInstantView2_0,
   AddNotificationGroupInfoMaxRemovedMessageId,
-  SupportMinithumbnails,  // 20
+  SupportMinithumbnails,
   AddVideoCallsSupport,
   AddPhotoSizeSource,
   AddFolders,
   SupportPolls2_0,
-  AddDiceEmoji,  // 25
-  AddAnimationStickers,
-  AddDialogPhotoHasAnimation,
-  AddPhotoProgressiveSizes,
-  AddLiveLocationHeading,
-  AddLiveLocationProximityAlertDistance,  // 30
   Next
 };
 
@@ -55,8 +49,6 @@ enum class DbVersion : int32 {
   AddNotificationsSupport,
   AddFolders,
   AddScheduledMessages,
-  StorePinnedDialogsInBinlog,
-  AddMessageThreadSupport,
   Next
 };
 

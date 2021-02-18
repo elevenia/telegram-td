@@ -1,5 +1,5 @@
 ﻿//
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -28,7 +28,7 @@ namespace TdApp
             _handler = new MyClientResultHandler(this);
 
             Td.Client.Execute(new TdApi.SetLogVerbosityLevel(0));
-            Td.Client.Execute(new TdApi.SetLogStream(new TdApi.LogStreamFile(Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path, "log"), 1 << 27, false)));
+            Td.Client.Execute(new TdApi.SetLogStream(new TdApi.LogStreamFile(Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path, "log"), 1 << 27)));
 
             System.Threading.Tasks.Task.Run(() =>
             {
@@ -43,6 +43,7 @@ namespace TdApp
                     parameters.ApiHash = "a3406de8d171bb422bb6ddf3bbd800e2";
                     parameters.SystemLanguageCode = "en";
                     parameters.DeviceModel = "Desktop";
+                    parameters.SystemVersion = "Unknown";
                     parameters.ApplicationVersion = "1.0.0";
                     _client.Send(new TdApi.SetTdlibParameters(parameters), null);
                     _client.Send(new TdApi.CheckDatabaseEncryptionKey(), null);

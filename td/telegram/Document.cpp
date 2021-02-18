@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -14,7 +14,7 @@
 #include "td/telegram/VideoNotesManager.h"
 #include "td/telegram/VideosManager.h"
 
-#include "td/utils/algorithm.h"
+#include "td/utils/misc.h"
 
 namespace td {
 
@@ -35,7 +35,6 @@ void Document::append_file_ids(const Td *td, vector<FileId> &file_ids) const {
   }
 
   file_ids.push_back(file_id);
-
   FileId thumbnail_file_id = [&] {
     switch (type) {
       case Type::Animation:
@@ -54,20 +53,6 @@ void Document::append_file_ids(const Td *td, vector<FileId> &file_ids) const {
   }();
   if (thumbnail_file_id.is_valid()) {
     file_ids.push_back(thumbnail_file_id);
-  }
-
-  FileId animated_thumbnail_file_id = [&] {
-    switch (type) {
-      case Type::Animation:
-        return td->animations_manager_->get_animation_animated_thumbnail_file_id(file_id);
-      case Type::Video:
-        return td->videos_manager_->get_video_animated_thumbnail_file_id(file_id);
-      default:
-        return FileId();
-    }
-  }();
-  if (animated_thumbnail_file_id.is_valid()) {
-    file_ids.push_back(animated_thumbnail_file_id);
   }
 }
 

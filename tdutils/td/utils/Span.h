@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -9,7 +9,6 @@
 #include "td/utils/common.h"
 
 #include <array>
-#include <iterator>
 
 namespace td {
 
@@ -75,44 +74,15 @@ class SpanImpl {
     return data_[i];
   }
 
-  InnerT &back() {
-    DCHECK(!empty());
-    return data_[size() - 1];
-  }
-
-  const InnerT &back() const {
-    DCHECK(!empty());
-    return data_[size() - 1];
-  }
-
-  InnerT &front() {
-    DCHECK(!empty());
-    return data_[0];
-  }
-
-  const InnerT &front() const {
-    DCHECK(!empty());
-    return data_[0];
-  }
-
   InnerT *data() const {
     return data_;
   }
-
   InnerT *begin() const {
     return data_;
   }
   InnerT *end() const {
     return data_ + size_;
   }
-
-  std::reverse_iterator<InnerT *> rbegin() const {
-    return std::reverse_iterator<InnerT *>(end());
-  }
-  std::reverse_iterator<InnerT *> rend() const {
-    return std::reverse_iterator<InnerT *>(begin());
-  }
-
   size_t size() const {
     return size_;
   }
@@ -121,9 +91,8 @@ class SpanImpl {
   }
 
   SpanImpl &truncate(size_t size) {
-    if (size < size_) {
-      size_ = size;
-    }
+    CHECK(size <= size_);
+    size_ = size;
     return *this;
   }
 
@@ -150,44 +119,8 @@ Span<T> span(const T *ptr, size_t size) {
   return Span<T>(ptr, size);
 }
 template <class T>
-Span<T> span(const vector<T> &vec) {
-  return Span<T>(vec);
-}
-
-template <class T>
 MutableSpan<T> mutable_span(T *ptr, size_t size) {
   return MutableSpan<T>(ptr, size);
-}
-template <class T>
-MutableSpan<T> mutable_span(vector<T> &vec) {
-  return MutableSpan<T>(vec);
-}
-
-template <class T>
-Span<T> span_one(const T &value) {
-  return Span<T>(&value, 1);
-}
-template <class T>
-MutableSpan<T> mutable_span_one(T &value) {
-  return MutableSpan<T>(&value, 1);
-}
-
-template <class T>
-Span<T> as_span(Span<T> span) {
-  return span;
-}
-template <class T>
-Span<T> as_span(const std::vector<T> &vec) {
-  return Span<T>(vec);
-}
-
-template <class T>
-MutableSpan<T> as_mutable_span(MutableSpan<T> span) {
-  return span;
-}
-template <class T>
-MutableSpan<T> as_mutable_span(std::vector<T> &vec) {
-  return MutableSpan<T>(vec);
 }
 
 }  // namespace td

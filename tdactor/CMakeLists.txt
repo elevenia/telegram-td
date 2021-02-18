@@ -6,13 +6,11 @@ endif()
 
 #SOURCE SETS
 set(TDACTOR_SOURCE
-  td/actor/ConcurrentScheduler.cpp
+  td/actor/impl/ConcurrentScheduler.cpp
   td/actor/impl/Scheduler.cpp
   td/actor/MultiPromise.cpp
   td/actor/Timeout.cpp
 
-  td/actor/actor.h
-  td/actor/ConcurrentScheduler.h
   td/actor/impl/Actor-decl.h
   td/actor/impl/Actor.h
   td/actor/impl/ActorId-decl.h
@@ -21,6 +19,7 @@ set(TDACTOR_SOURCE
   td/actor/impl/ActorInfo.h
   td/actor/impl/EventFull-decl.h
   td/actor/impl/EventFull.h
+  td/actor/impl/ConcurrentScheduler.h
   td/actor/impl/Event.h
   td/actor/impl/Scheduler-decl.h
   td/actor/impl/Scheduler.h
@@ -30,6 +29,7 @@ set(TDACTOR_SOURCE
   td/actor/SignalSlot.h
   td/actor/SleepActor.h
   td/actor/Timeout.h
+  td/actor/actor.h
 )
 
 set(TDACTOR_TEST_SOURCE

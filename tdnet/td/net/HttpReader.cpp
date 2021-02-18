@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -24,6 +24,30 @@ namespace td {
 
 constexpr const char HttpReader::TEMP_DIRECTORY_PREFIX[];
 
+static size_t urldecode(Slice from, MutableSlice to, bool decode_plus_sign_as_space) {
+  size_t to_i = 0;
+  CHECK(to.size() >= from.size());
+  for (size_t from_i = 0, n = from.size(); from_i < n; from_i++) {
+    if (from[from_i] == '%' && from_i + 2 < n) {
+      int high = hex_to_int(from[from_i + 1]);
+      int low = hex_to_int(from[from_i + 2]);
+      if (high < 16 && low < 16) {
+        to[to_i++] = static_cast<char>(high * 16 + low);
+        from_i += 2;
+        continue;
+      }
+    }
+    to[to_i++] = decode_plus_sign_as_space && from[from_i] == '+' ? ' ' : from[from_i];
+  }
+  return to_i;
+}
+
+static MutableSlice urldecode_inplace(MutableSlice str, bool decode_plus_sign_as_space) {
+  size_t result_size = urldecode(str, str, decode_plus_sign_as_space);
+  str.truncate(result_size);
+  return str;
+}
+
 void HttpReader::init(ChainBufferReader *input, size_t max_post_size, size_t max_files) {
   input_ = input;
   state_ = State::ReadHeaders;
@@ -36,7 +60,7 @@ void HttpReader::init(ChainBufferReader *input, size_t max_post_size, size_t max
   total_headers_length_ = 0;
 }
 
-Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
+Result<size_t> HttpReader::read_next(HttpQuery *query) {
   if (query_ != query) {
     CHECK(query_ == nullptr);
     query_ = query;
@@ -44,7 +68,6 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
   size_t need_size = input_->size() + 1;
   while (true) {
     if (state_ != State::ReadHeaders) {
-      gzip_flow_.wakeup();
       flow_source_.wakeup();
       if (flow_sink_.is_ready() && flow_sink_.status().is_error()) {
         if (!temp_file_.empty()) {
@@ -85,11 +108,7 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
         if (content_encoding_.empty()) {
         } else if (content_encoding_ == "gzip" || content_encoding_ == "deflate") {
           gzip_flow_ = GzipByteFlow(Gzip::Mode::Decode);
-          GzipByteFlow::Options options;
-          options.write_watermark.low = 0;
-          options.write_watermark.high = max(max_post_size_, static_cast<size_t>(1 << 16));
-          gzip_flow_.set_options(options);
-          gzip_flow_.set_max_output_size(MAX_CONTENT_SIZE);
+          gzip_flow_.set_max_output_size(MAX_FILE_SIZE);
           *source >> gzip_flow_;
           source = &gzip_flow_;
         } else {
@@ -129,7 +148,6 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
             end_p--;
           }
 
-          CHECK(p != nullptr);
           Slice boundary(p, static_cast<size_t>(end_p - p));
           if (boundary.empty() || boundary.size() > MAX_BOUNDARY_LENGTH) {
             return Status::Error(400, "Bad Request: boundary too big or empty");
@@ -151,10 +169,6 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
       case State::ReadContent: {
         if (content_->size() > max_post_size_) {
           state_ = State::ReadContentToFile;
-          GzipByteFlow::Options options;
-          options.write_watermark.low = 4 << 20;
-          options.write_watermark.high = 8 << 20;
-          gzip_flow_.set_options(options);
           continue;
         }
         if (flow_sink_.is_ready()) {
@@ -167,9 +181,6 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
         return need_size;
       }
       case State::ReadContentToFile: {
-        if (!can_be_slow) {
-          return Status::Error("SLOW");
-        }
         // save content to a file
         if (temp_file_.empty()) {
           auto file = open_temp_file("file");
@@ -179,18 +190,13 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
         }
 
         auto size = content_->size();
-        bool restart = false;
-        if (size > (1 << 20) || flow_sink_.is_ready()) {
+        if (size) {
           TRY_STATUS(save_file_part(content_->cut_head(size).move_as_buffer_slice()));
-          restart = true;
         }
         if (flow_sink_.is_ready()) {
           query_->files_.emplace_back("file", "", content_type_.str(), file_size_, temp_file_name_);
           close_temp_file();
           break;
-        }
-        if (restart) {
-          continue;
         }
 
         return need_size;
@@ -222,11 +228,9 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
         return need_size;
       }
       case State::ReadMultipartFormData: {
-        if (!content_->empty()) {
-          TRY_RESULT(result, parse_multipart_form_data(can_be_slow));
-          if (result) {
-            break;
-          }
+        TRY_RESULT(result, parse_multipart_form_data());
+        if (result) {
+          break;
         }
         return need_size;
       }
@@ -243,10 +247,9 @@ Result<size_t> HttpReader::read_next(HttpQuery *query, bool can_be_slow) {
 // returns Status on wrong request
 // returns true if parsing has finished
 // returns false if need more data
-Result<bool> HttpReader::parse_multipart_form_data(bool can_be_slow) {
+Result<bool> HttpReader::parse_multipart_form_data() {
   while (true) {
-    LOG(DEBUG) << "Parsing multipart form data in state " << static_cast<int32>(form_data_parse_state_)
-               << " with already read length " << form_data_read_length_;
+    LOG(DEBUG) << "Parsing multipart form data in state " << static_cast<int32>(form_data_parse_state_);
     switch (form_data_parse_state_) {
       case FormDataParseState::SkipPrologue:
         if (find_boundary(content_->clone(), {boundary_.c_str() + 2, boundary_.size() - 2}, form_data_read_length_)) {
@@ -428,9 +431,6 @@ Result<bool> HttpReader::parse_multipart_form_data(bool can_be_slow) {
         }
         return false;
       case FormDataParseState::ReadFile: {
-        if (!can_be_slow) {
-          return Status::Error("SLOW");
-        }
         if (find_boundary(content_->clone(), boundary_, form_data_read_length_)) {
           auto file_part = content_->cut_head(form_data_read_length_).move_as_buffer_slice();
           content_->advance(boundary_.size());
@@ -547,7 +547,7 @@ Status HttpReader::parse_url(MutableSlice url) {
     url_path_size++;
   }
 
-  query_->url_path_ = url_decode_inplace({url.data(), url_path_size}, false);
+  query_->url_path_ = urldecode_inplace({url.data(), url_path_size}, false);
 
   if (url_path_size == url.size() || url[url_path_size] != '?') {
     return Status::OK();
@@ -567,9 +567,9 @@ Status HttpReader::parse_parameters(MutableSlice parameters) {
     auto key_value = parser.read_till_nofail('&');
     parser.skip_nofail('&');
     Parser kv_parser(key_value);
-    auto key = url_decode_inplace(kv_parser.read_till_nofail('='), true);
+    auto key = urldecode_inplace(kv_parser.read_till_nofail('='), true);
     kv_parser.skip_nofail('=');
-    auto value = url_decode_inplace(kv_parser.data(), true);
+    auto value = urldecode_inplace(kv_parser.data(), true);
     query_->args_.emplace_back(key, value);
   }
 
@@ -662,12 +662,12 @@ Status HttpReader::parse_head(MutableSlice head) {
   parser.skip(' ');
   // GET POST HTTP/1.1
   if (type == "GET") {
-    query_->type_ = HttpQuery::Type::Get;
+    query_->type_ = HttpQuery::Type::GET;
   } else if (type == "POST") {
-    query_->type_ = HttpQuery::Type::Post;
+    query_->type_ = HttpQuery::Type::POST;
   } else if (type.size() >= 4 && type.substr(0, 4) == "HTTP") {
     if (type == "HTTP/1.1" || type == "HTTP/1.0") {
-      query_->type_ = HttpQuery::Type::Response;
+      query_->type_ = HttpQuery::Type::RESPONSE;
     } else {
       LOG(INFO) << "Unsupported HTTP version: " << type;
       return Status::Error(505, "HTTP Version Not Supported");
@@ -679,7 +679,7 @@ Status HttpReader::parse_head(MutableSlice head) {
 
   query_->args_.clear();
 
-  if (query_->type_ == HttpQuery::Type::Response) {
+  if (query_->type_ == HttpQuery::Type::RESPONSE) {
     query_->code_ = to_integer<int32>(parser.read_till(' '));
     parser.skip(' ');
     query_->reason_ = parser.read_till('\r');
@@ -798,7 +798,7 @@ Status HttpReader::save_file_part(BufferSlice &&file_part) {
   auto result_written = temp_file_.write(file_part.as_slice());
   if (result_written.is_error() || result_written.ok() != file_part.size()) {
     clean_temporary_file();
-    return Status::Error(500, "Internal Server Error: can't upload the file");
+    return Status::Error(500, "Internal server error: can't upload the file");
   }
   return Status::OK();
 }

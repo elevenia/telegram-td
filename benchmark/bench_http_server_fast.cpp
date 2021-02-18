@@ -1,11 +1,10 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 #include "td/actor/actor.h"
-#include "td/actor/ConcurrentScheduler.h"
 
 #include "td/net/HttpHeaderCreator.h"
 #include "td/net/HttpQuery.h"
@@ -35,10 +34,6 @@ class HttpEchoConnection : public Actor {
     Scheduler::subscribe(fd_.get_poll_info().extract_pollable_fd(this));
     reader_.init(&fd_.input_buffer(), 1024 * 1024, 0);
   }
-  void tear_down() override {
-    Scheduler::unsubscribe_before_close(fd_.get_poll_info().get_pollable_fd_ref());
-    fd_.close();
-  }
 
   void handle_query() {
     query_ = HttpQuery();
@@ -56,18 +51,19 @@ class HttpEchoConnection : public Actor {
   }
 
   void loop() override {
-    sync_with_poll(fd_);
     auto status = [&] {
       TRY_STATUS(loop_read());
       TRY_STATUS(loop_write());
       return Status::OK();
     }();
-    if (status.is_error() || can_close_local(fd_)) {
+    if (status.is_error() || can_close(fd_)) {
       stop();
     }
   }
   Status loop_read() {
-    TRY_STATUS(fd_.flush_read());
+    if (can_read(fd_)) {
+      TRY_STATUS(fd_.flush_read());
+    }
     while (true) {
       TRY_RESULT(need, reader_.read_next(&query_));
       if (need == 0) {
@@ -84,7 +80,7 @@ class HttpEchoConnection : public Actor {
   }
 };
 
-const int N = 8;
+const int N = 4;
 class Server : public TcpListener::Callback {
  public:
   void start_up() override {

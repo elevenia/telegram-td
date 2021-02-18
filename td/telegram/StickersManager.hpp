@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -12,6 +12,7 @@
 #include "td/telegram/misc.h"
 #include "td/telegram/Photo.hpp"
 
+#include "td/utils/format.h"
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
 #include "td/utils/Slice.h"
@@ -25,13 +26,11 @@ void StickersManager::store_sticker(FileId file_id, bool in_sticker_set, StorerT
   CHECK(it != stickers_.end());
   const Sticker *sticker = it->second.get();
   bool has_sticker_set_access_hash = sticker->set_id.is_valid() && !in_sticker_set;
-  bool has_minithumbnail = !sticker->minithumbnail.empty();
   BEGIN_STORE_FLAGS();
   STORE_FLAG(sticker->is_mask);
   STORE_FLAG(has_sticker_set_access_hash);
   STORE_FLAG(in_sticker_set);
   STORE_FLAG(sticker->is_animated);
-  STORE_FLAG(has_minithumbnail);
   END_STORE_FLAGS();
   if (!in_sticker_set) {
     store(sticker->set_id.get(), storer);
@@ -52,9 +51,6 @@ void StickersManager::store_sticker(FileId file_id, bool in_sticker_set, StorerT
     store(sticker->y_shift, storer);
     store(sticker->scale, storer);
   }
-  if (has_minithumbnail) {
-    store(sticker->minithumbnail, storer);
-  }
 }
 
 template <class ParserT>
@@ -66,20 +62,19 @@ FileId StickersManager::parse_sticker(bool in_sticker_set, ParserT &parser) {
   auto sticker = make_unique<Sticker>();
   bool has_sticker_set_access_hash;
   bool in_sticker_set_stored;
-  bool has_minithumbnail;
   BEGIN_PARSE_FLAGS();
   PARSE_FLAG(sticker->is_mask);
   PARSE_FLAG(has_sticker_set_access_hash);
   PARSE_FLAG(in_sticker_set_stored);
   PARSE_FLAG(sticker->is_animated);
-  PARSE_FLAG(has_minithumbnail);
   END_PARSE_FLAGS();
   if (in_sticker_set_stored != in_sticker_set) {
     Slice data = parser.template fetch_string_raw<Slice>(parser.get_left_len());
     for (auto c : data) {
       if (c != '\0') {
-        parser.set_error("Invalid sticker set is stored in the database");
-        break;
+        LOG_CHECK(in_sticker_set_stored == in_sticker_set)
+            << in_sticker_set << " " << in_sticker_set_stored << " " << parser.version() << " " << sticker->is_mask
+            << " " << has_sticker_set_access_hash << " " << format::as_hex_dump<4>(data);
       }
     }
     parser.set_error("Zero sticker set is stored in the database");
@@ -112,9 +107,6 @@ FileId StickersManager::parse_sticker(bool in_sticker_set, ParserT &parser) {
     parse(sticker->y_shift, parser);
     parse(sticker->scale, parser);
   }
-  if (has_minithumbnail) {
-    parse(sticker->minithumbnail, parser);
-  }
   if (parser.get_error() != nullptr || !sticker->file_id.is_valid()) {
     return FileId();
   }
@@ -129,7 +121,6 @@ void StickersManager::store_sticker_set(const StickerSet *sticker_set, bool with
   bool is_loaded = sticker_set->is_loaded && is_full;
   bool has_expires_at = !sticker_set->is_installed && sticker_set->expires_at != 0;
   bool has_thumbnail = sticker_set->thumbnail.file_id.is_valid();
-  bool has_minithumbnail = !sticker_set->minithumbnail.empty();
   BEGIN_STORE_FLAGS();
   STORE_FLAG(sticker_set->is_inited);
   STORE_FLAG(was_loaded);
@@ -143,8 +134,6 @@ void StickersManager::store_sticker_set(const StickerSet *sticker_set, bool with
   STORE_FLAG(has_thumbnail);
   STORE_FLAG(sticker_set->is_thumbnail_reloaded);
   STORE_FLAG(sticker_set->is_animated);
-  STORE_FLAG(sticker_set->are_legacy_sticker_thumbnails_reloaded);
-  STORE_FLAG(has_minithumbnail);
   END_STORE_FLAGS();
   store(sticker_set->id.get(), storer);
   store(sticker_set->access_hash, storer);
@@ -158,9 +147,6 @@ void StickersManager::store_sticker_set(const StickerSet *sticker_set, bool with
     }
     if (has_thumbnail) {
       store(sticker_set->thumbnail, storer);
-    }
-    if (has_minithumbnail) {
-      store(sticker_set->minithumbnail, storer);
     }
 
     uint32 stored_sticker_count = narrow_cast<uint32>(is_full ? sticker_set->sticker_ids.size() : stickers_limit);
@@ -190,10 +176,9 @@ void StickersManager::parse_sticker_set(StickerSet *sticker_set, ParserT &parser
   bool is_archived;
   bool is_official;
   bool is_masks;
+  bool is_animated;
   bool has_expires_at;
   bool has_thumbnail;
-  bool is_animated;
-  bool has_minithumbnail;
   BEGIN_PARSE_FLAGS();
   PARSE_FLAG(sticker_set->is_inited);
   PARSE_FLAG(sticker_set->was_loaded);
@@ -207,8 +192,6 @@ void StickersManager::parse_sticker_set(StickerSet *sticker_set, ParserT &parser
   PARSE_FLAG(has_thumbnail);
   PARSE_FLAG(sticker_set->is_thumbnail_reloaded);
   PARSE_FLAG(is_animated);
-  PARSE_FLAG(sticker_set->are_legacy_sticker_thumbnails_reloaded);
-  PARSE_FLAG(has_minithumbnail);
   END_PARSE_FLAGS();
   int64 sticker_set_id;
   int64 access_hash;
@@ -216,15 +199,13 @@ void StickersManager::parse_sticker_set(StickerSet *sticker_set, ParserT &parser
   parse(access_hash, parser);
   CHECK(sticker_set->id.get() == sticker_set_id);
   if (sticker_set->access_hash != access_hash) {
-    LOG(ERROR) << "Access hash of " << sticker_set->id << " has changed from " << access_hash << " to "
+    LOG(ERROR) << "Access hash of " << sticker_set_id << " has changed from " << access_hash << " to "
                << sticker_set->access_hash;
   }
 
   if (sticker_set->is_inited) {
     string title;
     string short_name;
-    string minithumbnail;
-    PhotoSize thumbnail;
     int32 sticker_count;
     int32 hash;
     int32 expires_at = 0;
@@ -236,17 +217,11 @@ void StickersManager::parse_sticker_set(StickerSet *sticker_set, ParserT &parser
       parse(expires_at, parser);
     }
     if (has_thumbnail) {
-      parse(thumbnail, parser);
+      parse(sticker_set->thumbnail, parser);
     }
-    if (has_minithumbnail) {
-      parse(minithumbnail, parser);
-    }
-
     if (!was_inited) {
       sticker_set->title = std::move(title);
       sticker_set->short_name = std::move(short_name);
-      sticker_set->minithumbnail = std::move(minithumbnail);
-      sticker_set->thumbnail = std::move(thumbnail);
       sticker_set->sticker_count = sticker_count;
       sticker_set->hash = hash;
       sticker_set->expires_at = expires_at;

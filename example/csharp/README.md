@@ -7,7 +7,7 @@ This is an example of building TDLib with `C++/CLI` support and an example of TD
 * Download and install Microsoft Visual Studio 2015 or later.
 * Download and install [CMake](https://cmake.org/download/); choose "Add CMake to the system PATH" option while installing.
 * Install [vcpkg](https://github.com/Microsoft/vcpkg#quick-start) or update it to the latest version using `vcpkg update` and following received instructions.
-* Install `zlib` and `openssl` using `vcpkg`:
+* Install `zlib` and `openssl` for using `vcpkg`:
 ```
 cd <path to vcpkg>
 .\vcpkg.exe install openssl:x64-windows openssl:x86-windows zlib:x64-windows zlib:x86-windows
@@ -19,13 +19,7 @@ cd <path to vcpkg>
 cd <path to TDLib sources>/example/csharp
 mkdir build
 cd build
-cmake -A Win32 -DTD_ENABLE_DOTNET=ON -DCMAKE_TOOLCHAIN_FILE=<path to vcpkg>/scripts/buildsystems/vcpkg.cmake ../../..
-cmake --build . --config Release
-cmake --build . --config Debug
-cd ..
-mkdir build64
-cd build64
-cmake -A x64 -DTD_ENABLE_DOTNET=ON -DCMAKE_TOOLCHAIN_FILE=<path to vcpkg>/scripts/buildsystems/vcpkg.cmake ../../..
+cmake -DTD_ENABLE_DOTNET=ON -DCMAKE_TOOLCHAIN_FILE=<path to vcpkg>\scripts\buildsystems\vcpkg.cmake ../../..
 cmake --build . --config Release
 cmake --build . --config Debug
 ```
@@ -34,6 +28,6 @@ cmake --build . --config Debug
 
 After `TDLib` is built you can open and run TdExample project.
 It contains a simple console C# application with implementation of authorization and message sending.
-Just open it with Visual Studio 2015 or later and run.
+Just open it with Visual Studio 2015 or 2017 and run.
 
 Also see TdExample.csproj for example of including TDLib in C# project with all native shared library dependencies.

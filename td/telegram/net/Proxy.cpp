@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -10,12 +10,12 @@
 
 namespace td {
 
-Result<Proxy> Proxy::create_proxy(string server, int port, td_api::ProxyType *proxy_type) {
+Result<Proxy> Proxy::from_td_api(string server, int port, td_api::ProxyType *proxy_type) {
   if (proxy_type == nullptr) {
-    return Status::Error(400, "Proxy type must be non-empty");
+    return Status::Error(400, "Proxy type should not be empty");
   }
   if (server.empty()) {
-    return Status::Error(400, "Server name must be non-empty");
+    return Status::Error(400, "Server name can't be empty");
   }
   if (server.size() > 255) {
     return Status::Error(400, "Server name is too long");

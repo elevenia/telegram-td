@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -32,39 +32,23 @@ struct CallProtocol {
   bool udp_reflector{true};
   int32 min_layer{65};
   int32 max_layer{65};
-  vector<string> library_versions;
 
-  CallProtocol() = default;
-
-  explicit CallProtocol(const td_api::callProtocol &protocol);
-
-  explicit CallProtocol(const telegram_api::phoneCallProtocol &protocol);
-
-  tl_object_ptr<telegram_api::phoneCallProtocol> get_input_phone_call_protocol() const;
-
-  tl_object_ptr<td_api::callProtocol> get_call_protocol_object() const;
+  static CallProtocol from_telegram_api(const telegram_api::phoneCallProtocol &protocol);
+  tl_object_ptr<telegram_api::phoneCallProtocol> as_telegram_api() const;
+  static CallProtocol from_td_api(const td_api::callProtocol &protocol);
+  tl_object_ptr<td_api::callProtocol> as_td_api() const;
 };
 
 struct CallConnection {
-  enum class Type : int32 { Telegram, Webrtc };
-  Type type;
   int64 id;
   string ip;
   string ipv6;
   int32 port;
-
-  // Telegram
   string peer_tag;
 
-  // WebRTC
-  string username;
-  string password;
-  bool supports_turn = false;
-  bool supports_stun = false;
-
-  explicit CallConnection(const telegram_api::PhoneConnection &connection);
-
-  tl_object_ptr<td_api::callServer> get_call_server_object() const;
+  static CallConnection from_telegram_api(const telegram_api::phoneConnection &connection);
+  tl_object_ptr<telegram_api::phoneConnection> as_telegram_api() const;
+  tl_object_ptr<td_api::callConnection> as_td_api() const;
 };
 
 struct CallState {
@@ -86,7 +70,7 @@ struct CallState {
 
   Status error;
 
-  tl_object_ptr<td_api::CallState> get_call_state_object() const;
+  tl_object_ptr<td_api::CallState> as_td_api() const;
 };
 
 class CallActor : public NetQueryCallback {
@@ -95,10 +79,8 @@ class CallActor : public NetQueryCallback {
 
   void create_call(UserId user_id, tl_object_ptr<telegram_api::InputUser> &&input_user, CallProtocol &&protocol,
                    bool is_video, Promise<CallId> &&promise);
-  void accept_call(CallProtocol &&protocol, Promise<> promise);
-  void update_call_signaling_data(string data);
-  void send_call_signaling_data(string &&data, Promise<> promise);
   void discard_call(bool is_disconnected, int32 duration, bool is_video, int64 connection_id, Promise<> promise);
+  void accept_call(CallProtocol &&protocol, Promise<> promise);
   void rate_call(int32 rating, string comment, vector<td_api::object_ptr<td_api::CallProblem>> &&problems,
                  Promise<> promise);
   void send_call_debug_information(string data, Promise<> promise);

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -20,7 +20,7 @@ void HttpProxy::send_connect() {
   CHECK(state_ == State::SendConnect);
   state_ = State::WaitConnectResponse;
 
-  string host = PSTRING() << ip_address_.get_ip_host() << ':' << ip_address_.get_port();
+  string host = PSTRING() << ip_address_.get_ip_str() << ':' << ip_address_.get_port();
   string proxy_authorization;
   if (!username_.empty() || !password_.empty()) {
     auto userinfo = PSTRING() << username_ << ':' << password_;
@@ -47,7 +47,7 @@ Status HttpProxy::wait_connect_response() {
     size_t len = min(sizeof(buf), it.size());
     it.advance(len, MutableSlice{buf, sizeof(buf)});
     VLOG(proxy) << "Failed to connect: " << format::escaped(Slice(buf, len));
-    return Status::Error(PSLICE() << "Failed to connect to " << ip_address_.get_ip_host() << ':'
+    return Status::Error(PSLICE() << "Failed to connect to " << ip_address_.get_ip_str() << ':'
                                   << ip_address_.get_port());
   }
 

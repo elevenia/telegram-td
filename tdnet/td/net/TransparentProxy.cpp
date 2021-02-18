@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -55,14 +55,12 @@ void TransparentProxy::start_up() {
   VLOG(proxy) << "Begin to connect to proxy";
   Scheduler::subscribe(fd_.get_poll_info().extract_pollable_fd(this));
   set_timeout_in(10);
-  sync_with_poll(fd_);
-  if (can_write_local(fd_)) {
+  if (can_write(fd_)) {
     loop();
   }
 }
 
 void TransparentProxy::loop() {
-  sync_with_poll(fd_);
   auto status = [&] {
     TRY_STATUS(fd_.flush_read());
     TRY_STATUS(loop_impl());
@@ -72,7 +70,7 @@ void TransparentProxy::loop() {
   if (status.is_error()) {
     on_error(std::move(status));
   }
-  if (can_close_local(fd_)) {
+  if (can_close(fd_)) {
     on_error(Status::Error("Connection closed"));
   }
 }

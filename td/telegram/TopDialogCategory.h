@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -24,7 +24,7 @@ enum class TopDialogCategory : int32 {
   Size
 };
 
-inline TopDialogCategory get_top_dialog_category(const td_api::TopChatCategory &category) {
+inline TopDialogCategory top_dialog_category_from_td_api(const td_api::TopChatCategory &category) {
   switch (category.get_id()) {
     case td_api::topChatCategoryUsers::ID:
       return TopDialogCategory::Correspondent;

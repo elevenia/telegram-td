@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -38,7 +38,6 @@
 #include <map>
 #include <memory>
 #include <set>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -58,7 +57,7 @@ struct NewRemoteFileLocation {
   unique_ptr<PartialRemoteFileLocation> partial;
 
   //TODO: use RemoteId
-  // hardest part is to determine whether we should flush this location to db.
+  // hardest part is to determine wether we should flush this location to db.
   // probably, will need some generation in RemoteInfo
   optional<FullRemoteFileLocation> full;
   bool is_full_alive{false};  // if false, then we may try to upload this file
@@ -118,15 +117,11 @@ class FileNode {
   void on_pmc_flushed();
   void on_info_flushed();
 
-  string suggested_path() const;
+  string suggested_name() const;
 
  private:
   friend class FileView;
   friend class FileManager;
-
-  static constexpr char PERSISTENT_ID_VERSION_OLD = 2;
-  static constexpr char PERSISTENT_ID_VERSION_MAP = 3;
-  static constexpr char PERSISTENT_ID_VERSION = 4;
 
   LocalFileLocation local_;
   FileLoadManager::QueryId upload_id_ = 0;
@@ -156,7 +151,6 @@ class FileNode {
   double last_successful_force_reupload_time_ = -1e10;
 
   FileId upload_pause_;
-
   int8 upload_priority_ = 0;
   int8 download_priority_ = 0;
   int8 generate_priority_ = 0;
@@ -183,8 +177,6 @@ class FileNode {
 
   bool upload_was_update_file_reference_{false};
   bool download_was_update_file_reference_{false};
-
-  bool upload_prefer_small_{false};
 
   void init_ready_size();
 
@@ -258,7 +250,7 @@ class FileView {
 
   const string &remote_name() const;
 
-  string suggested_path() const;
+  string suggested_name() const;
 
   DialogId owner_dialog_id() const;
 
@@ -326,20 +318,11 @@ class FileView {
     auto type = remote_location().get_source().get_type();
     return type == PhotoSizeSource::Type::DialogPhotoBig || type == PhotoSizeSource::Type::DialogPhotoSmall ||
            type == PhotoSizeSource::Type::StickerSetThumbnail;
+    return false;
   }
-
-  string get_persistent_file_id() const;
-
-  string get_unique_file_id() const;
 
  private:
   ConstFileNodePtr node_{};
-
-  static string get_unique_id(const FullGenerateFileLocation &location);
-  static string get_unique_id(const FullRemoteFileLocation &location);
-
-  static string get_persistent_id(const FullGenerateFileLocation &location);
-  static string get_persistent_id(const FullRemoteFileLocation &location);
 };
 
 class FileManager : public FileLoadManager::Callback {
@@ -378,7 +361,7 @@ class FileManager : public FileLoadManager::Callback {
 
   class Context {
    public:
-    virtual void on_new_file(int64 size, int64 real_size, int32 cnt) = 0;
+    virtual void on_new_file(int64 size, int32 cnt) = 0;
 
     virtual void on_file_updated(FileId size) = 0;
 
@@ -419,11 +402,9 @@ class FileManager : public FileLoadManager::Callback {
 
   FileId register_empty(FileType type);
   Result<FileId> register_local(FullLocalFileLocation location, DialogId owner_dialog_id, int64 size,
-                                bool get_by_hash = false, bool force = false,
-                                bool skip_file_size_checks = false) TD_WARN_UNUSED_RESULT;
+                                bool get_by_hash = false, bool force = false) TD_WARN_UNUSED_RESULT;
   FileId register_remote(const FullRemoteFileLocation &location, FileLocationSource file_location_source,
-                         DialogId owner_dialog_id, int64 size, int64 expected_size,
-                         string remote_name) TD_WARN_UNUSED_RESULT;
+                         DialogId owner_dialog_id, int64 size, int64 expected_size, string name) TD_WARN_UNUSED_RESULT;
   Result<FileId> register_generate(FileType file_type, FileLocationSource file_location_source, string original_path,
                                    string conversion, DialogId owner_dialog_id,
                                    int64 expected_size) TD_WARN_UNUSED_RESULT;
@@ -437,9 +418,6 @@ class FileManager : public FileLoadManager::Callback {
   void change_files_source(FileSourceId file_source_id, const vector<FileId> &old_file_ids,
                            const vector<FileId> &new_file_ids);
 
-  void on_file_reference_repaired(FileId file_id, FileSourceId file_source_id, Result<Unit> &&result,
-                                  Promise<Unit> &&promise);
-
   bool set_encryption_key(FileId file_id, FileEncryptionKey key);
   bool set_content(FileId file_id, BufferSlice bytes);
 
@@ -447,7 +425,7 @@ class FileManager : public FileLoadManager::Callback {
                 int64 limit);
   void upload(FileId file_id, std::shared_ptr<UploadCallback> callback, int32 new_priority, uint64 upload_order);
   void resume_upload(FileId file_id, std::vector<int> bad_parts, std::shared_ptr<UploadCallback> callback,
-                     int32 new_priority, uint64 upload_order, bool force = false, bool prefer_small = false);
+                     int32 new_priority, uint64 upload_order, bool force = false);
   void cancel_upload(FileId file_id);
   bool delete_partial_remote_location(FileId file_id);
   void delete_file_reference(FileId file_id, std::string file_reference);
@@ -477,8 +455,6 @@ class FileManager : public FileLoadManager::Callback {
   Result<FileId> get_map_thumbnail_file_id(Location location, int32 zoom, int32 width, int32 height, int32 scale,
                                            DialogId owner_dialog_id) TD_WARN_UNUSED_RESULT;
 
-  FileType guess_file_type(const tl_object_ptr<td_api::InputFile> &file);
-
   vector<tl_object_ptr<telegram_api::InputDocument>> get_input_documents(const vector<FileId> &file_ids);
 
   static bool extract_was_uploaded(const tl_object_ptr<telegram_api::InputMedia> &input_media);
@@ -499,13 +475,17 @@ class FileManager : public FileLoadManager::Callback {
   FileId parse_file(ParserT &parser);
 
  private:
+  static constexpr char PERSISTENT_ID_VERSION_OLD = 2;
+  static constexpr char PERSISTENT_ID_VERSION_MAP = 3;
+  static constexpr char PERSISTENT_ID_VERSION = 4;
+
   Result<FileId> check_input_file_id(FileType type, Result<FileId> result, bool is_encrypted, bool allow_zero,
                                      bool is_secure) TD_WARN_UNUSED_RESULT;
 
   FileId register_url(string url, FileType file_type, FileLocationSource file_location_source,
                       DialogId owner_dialog_id);
-  Result<FileId> register_file(FileData &&data, FileLocationSource file_location_source, const char *source, bool force,
-                               bool skip_file_size_checks = false);
+  Result<FileId> register_file(FileData &&data, FileLocationSource file_location_source, const char *source,
+                               bool force);
 
   static constexpr int8 FROM_BYTES_PRIORITY = 10;
 
@@ -566,8 +546,6 @@ class FileManager : public FileLoadManager::Callback {
   };
   Enumerator<RemoteInfo> remote_location_info_;
 
-  std::unordered_map<string, FileId> file_hash_to_file_id_;
-
   std::map<FullLocalFileLocation, FileId> local_location_to_file_id_;
   std::map<FullGenerateFileLocation, FileId> generate_location_to_file_id_;
   std::map<FileDbId, int32> pmc_id_to_file_node_id_;
@@ -600,7 +578,7 @@ class FileManager : public FileLoadManager::Callback {
 
   Status check_local_location(FileNodePtr node);
   bool try_fix_partial_local_location(FileNodePtr node);
-  Status check_local_location(FullLocalFileLocation &location, int64 &size, bool skip_file_size_checks);
+  Status check_local_location(FullLocalFileLocation &location, int64 &size);
   void try_flush_node_full(FileNodePtr node, bool new_remote, bool new_local, bool new_generate, FileDbId other_pmc_id);
   void try_flush_node(FileNodePtr node, const char *source);
   void try_flush_node_info(FileNodePtr node, const char *source);
@@ -608,6 +586,12 @@ class FileManager : public FileLoadManager::Callback {
   void clear_from_pmc(FileNodePtr node);
   void flush_to_pmc(FileNodePtr node, bool new_remote, bool new_local, bool new_generate, const char *source);
   void load_from_pmc(FileNodePtr node, bool new_remote, bool new_local, bool new_generate);
+
+  string get_unique_id(const FullGenerateFileLocation &location);
+  string get_unique_id(const FullRemoteFileLocation &location);
+
+  string get_persistent_id(const FullGenerateFileLocation &location);
+  string get_persistent_id(const FullRemoteFileLocation &location);
 
   Result<FileId> from_persistent_id_map(Slice binary, FileType file_type);
   Result<FileId> from_persistent_id_v2(Slice binary, FileType file_type);
@@ -634,7 +618,7 @@ class FileManager : public FileLoadManager::Callback {
   void do_cancel_upload(FileNodePtr node);
   void do_cancel_generate(FileNodePtr node);
   void run_upload(FileNodePtr node, std::vector<int> bad_parts);
-  void run_download(FileNodePtr node, bool force_update_priority);
+  void run_download(FileNodePtr node);
   void run_generate(FileNodePtr node);
 
   void on_start_download(QueryId query_id) override;

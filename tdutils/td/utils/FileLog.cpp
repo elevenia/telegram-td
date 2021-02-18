@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -12,6 +12,8 @@
 #include "td/utils/port/path.h"
 #include "td/utils/port/StdStreams.h"
 #include "td/utils/Slice.h"
+
+#include <limits>
 
 namespace td {
 
@@ -65,10 +67,6 @@ int64 FileLog::get_rotate_threshold() const {
   return rotate_threshold_;
 }
 
-bool FileLog::get_redirect_stderr() const {
-  return redirect_stderr_;
-}
-
 void FileLog::append(CSlice cslice, int log_level) {
   Slice slice = cslice;
   while (!slice.empty()) {
@@ -84,7 +82,7 @@ void FileLog::append(CSlice cslice, int log_level) {
     process_fatal_error(cslice);
   }
 
-  if (size_ > rotate_threshold_ || want_rotate_.load(std::memory_order_relaxed)) {
+  if (size_ > rotate_threshold_) {
     auto status = rename(path_, PSLICE() << path_ << ".old");
     if (status.is_error()) {
       process_fatal_error(PSLICE() << status.error() << " in " << __FILE__ << " at " << __LINE__);
@@ -100,13 +98,9 @@ void FileLog::rotate() {
   do_rotate();
 }
 
-void FileLog::lazy_rotate() {
-  want_rotate_ = true;
-}
-
 void FileLog::do_rotate() {
-  want_rotate_ = false;
-  ScopedDisableLog disable_log;  // to ensure that nothing will be printed to the closed log
+  auto current_verbosity_level = GET_VERBOSITY_LEVEL();
+  SET_VERBOSITY_LEVEL(std::numeric_limits<int>::min());  // to ensure that nothing will be printed to the closed log
   CHECK(!path_.empty());
   fd_.close();
   auto r_fd = FileFd::open(path_, FileFd::Create | FileFd::Truncate | FileFd::Write);
@@ -118,12 +112,7 @@ void FileLog::do_rotate() {
     fd_.get_native_fd().duplicate(Stderr().get_native_fd()).ignore();
   }
   size_ = 0;
-}
-
-Result<unique_ptr<LogInterface>> FileLog::create(string path, int64 rotate_threshold, bool redirect_stderr) {
-  auto l = make_unique<FileLog>();
-  TRY_STATUS(l->init(std::move(path), rotate_threshold, redirect_stderr));
-  return std::move(l);
+  SET_VERBOSITY_LEVEL(current_verbosity_level);
 }
 
 }  // namespace td

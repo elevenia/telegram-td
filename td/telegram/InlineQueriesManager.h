@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -62,8 +62,7 @@ class InlineQueriesManager : public Actor {
 
   tl_object_ptr<td_api::inlineQueryResults> get_inline_query_results_object(uint64 query_hash);
 
-  void on_new_query(int64 query_id, UserId sender_user_id, Location user_location,
-                    tl_object_ptr<telegram_api::InlineQueryPeerType> peer_type, const string &query,
+  void on_new_query(int64 query_id, UserId sender_user_id, Location user_location, const string &query,
                     const string &offset);
 
   void on_chosen_result(UserId user_id, Location user_location, const string &query, const string &result_id,
@@ -93,7 +92,7 @@ class InlineQueriesManager : public Actor {
                                        tl_object_ptr<telegram_api::BotInlineMessage> &&inline_message,
                                        int32 allowed_media_content_id, Photo *photo = nullptr, Game *game = nullptr);
 
-  tl_object_ptr<td_api::thumbnail> register_thumbnail(
+  tl_object_ptr<td_api::photoSize> register_thumbnail(
       tl_object_ptr<telegram_api::WebDocument> &&web_document_ptr) const;
 
   static string get_web_document_url(const tl_object_ptr<telegram_api::WebDocument> &web_document_ptr);
@@ -120,14 +119,14 @@ class InlineQueriesManager : public Actor {
   struct PendingInlineQuery {
     uint64 query_hash;
     UserId bot_user_id;
-    tl_object_ptr<telegram_api::InputPeer> input_peer;
+    DialogId dialog_id;
     Location user_location;
     string query;
     string offset;
     Promise<Unit> promise;
   };
 
-  double next_inline_query_time_ = 0.0;
+  double next_inline_query_time_ = -1.0;
   unique_ptr<PendingInlineQuery> pending_inline_query_;
   NetQueryRef sent_query_;
 

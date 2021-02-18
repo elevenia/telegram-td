@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -36,7 +36,7 @@ TEST(HazardPointers, stress) {
         }
         holder.clear();
         if (td::Random::fast(0, 5) == 0) {
-          std::string *new_str = new std::string(td::Random::fast_bool() ? "one" : "twotwo");
+          std::string *new_str = new std::string(td::Random::fast(0, 1) == 0 ? "one" : "twotwo");
           if (node.name_.compare_exchange_strong(str, new_str, std::memory_order_acq_rel)) {
             hazard_pointers.retire(thread_id, str);
           } else {

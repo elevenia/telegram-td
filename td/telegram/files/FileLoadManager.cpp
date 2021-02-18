@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -158,8 +158,7 @@ void FileLoadManager::update_local_file_location(QueryId id, const LocalFileLoca
   }
   send_closure(node->loader_, &FileLoaderActor::update_local_file_location, local);
 }
-
-void FileLoadManager::update_downloaded_part(QueryId id, int64 offset, int64 limit) {
+void FileLoadManager::update_download_offset(QueryId id, int64 offset) {
   if (stop_flag_) {
     return;
   }
@@ -171,9 +170,22 @@ void FileLoadManager::update_downloaded_part(QueryId id, int64 offset, int64 lim
   if (node == nullptr) {
     return;
   }
-  send_closure(node->loader_, &FileLoaderActor::update_downloaded_part, offset, limit);
+  send_closure(node->loader_, &FileLoaderActor::update_download_offset, offset);
 }
-
+void FileLoadManager::update_download_limit(QueryId id, int64 limit) {
+  if (stop_flag_) {
+    return;
+  }
+  auto it = query_id_to_node_id_.find(id);
+  if (it == query_id_to_node_id_.end()) {
+    return;
+  }
+  auto node = nodes_container_.get(it->second);
+  if (node == nullptr) {
+    return;
+  }
+  send_closure(node->loader_, &FileLoaderActor::update_download_limit, limit);
+}
 void FileLoadManager::hangup() {
   nodes_container_.for_each([](auto id, auto &node) { node.loader_.reset(); });
   stop_flag_ = true;

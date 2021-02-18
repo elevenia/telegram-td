@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -47,9 +47,7 @@ void FileReferenceManager::store_file_source(FileSourceId file_source_id, Storer
                           [&](const FileSourceBackground &source) {
                             td::store(source.background_id, storer);
                             td::store(source.access_hash, storer);
-                          },
-                          [&](const FileSourceChatFull &source) { td::store(source.chat_id, storer); },
-                          [&](const FileSourceChannelFull &source) { td::store(source.channel_id, storer); }));
+                          }));
 }
 
 template <class ParserT>
@@ -71,12 +69,12 @@ FileSourceId FileReferenceManager::parse_file_source(Td *td, ParserT &parser) {
     case 2: {
       ChatId chat_id;
       td::parse(chat_id, parser);
-      return FileSourceId();  // there is no need to repair chat photos
+      return td->contacts_manager_->get_chat_photo_file_source_id(chat_id);
     }
     case 3: {
       ChannelId channel_id;
       td::parse(channel_id, parser);
-      return FileSourceId();  // there is no need to repair channel photos
+      return td->contacts_manager_->get_channel_photo_file_source_id(channel_id);
     }
     case 4:
       return FileSourceId();  // there is no way to repair old wallpapers
@@ -100,16 +98,6 @@ FileSourceId FileReferenceManager::parse_file_source(Td *td, ParserT &parser) {
       td::parse(background_id, parser);
       td::parse(access_hash, parser);
       return td->background_manager_->get_background_file_source_id(background_id, access_hash);
-    }
-    case 10: {
-      ChatId chat_id;
-      td::parse(chat_id, parser);
-      return td->contacts_manager_->get_chat_full_file_source_id(chat_id);
-    }
-    case 11: {
-      ChannelId channel_id;
-      td::parse(channel_id, parser);
-      return td->contacts_manager_->get_channel_full_file_source_id(channel_id);
     }
     default:
       parser.set_error("Invalid type in FileSource");

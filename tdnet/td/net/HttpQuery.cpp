@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -24,8 +24,8 @@ MutableSlice HttpQuery::get_arg(Slice key) const {
   return it == args_.end() ? MutableSlice() : it->second;
 }
 
-vector<std::pair<string, string>> HttpQuery::get_args() const {
-  vector<std::pair<string, string>> res;
+std::vector<std::pair<string, string>> HttpQuery::get_args() const {
+  std::vector<std::pair<string, string>> res;
   res.reserve(args_.size());
   for (auto &it : args_) {
     res.emplace_back(it.first.str(), it.second.str());
@@ -48,20 +48,20 @@ int HttpQuery::get_retry_after() const {
 
 StringBuilder &operator<<(StringBuilder &sb, const HttpQuery &q) {
   switch (q.type_) {
-    case HttpQuery::Type::Empty:
+    case HttpQuery::Type::EMPTY:
       sb << "EMPTY";
       return sb;
-    case HttpQuery::Type::Get:
+    case HttpQuery::Type::GET:
       sb << "GET";
       break;
-    case HttpQuery::Type::Post:
+    case HttpQuery::Type::POST:
       sb << "POST";
       break;
-    case HttpQuery::Type::Response:
+    case HttpQuery::Type::RESPONSE:
       sb << "RESPONSE";
       break;
   }
-  if (q.type_ == HttpQuery::Type::Response) {
+  if (q.type_ == HttpQuery::Type::RESPONSE) {
     sb << ":" << q.code_ << ":" << q.reason_;
   } else {
     sb << ":" << q.url_path_;

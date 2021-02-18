@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -19,8 +19,9 @@
 namespace td {
 namespace mtproto {
 
-ActorOwn<> create_ping_actor(string debug, unique_ptr<RawConnection> raw_connection, unique_ptr<AuthData> auth_data,
-                             Promise<unique_ptr<RawConnection>> promise, ActorShared<> parent) {
+ActorOwn<> create_ping_actor(std::string debug, unique_ptr<RawConnection> raw_connection,
+                             unique_ptr<AuthData> auth_data, Promise<unique_ptr<RawConnection>> promise,
+                             ActorShared<> parent) {
   class PingActor : public Actor {
    public:
     PingActor(unique_ptr<RawConnection> raw_connection, unique_ptr<AuthData> auth_data,

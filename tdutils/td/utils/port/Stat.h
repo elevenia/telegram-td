@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -26,12 +26,19 @@ struct Stat {
 Result<Stat> stat(CSlice path) TD_WARN_UNUSED_RESULT;
 
 struct CpuStat {
-  uint64 total_ticks_{0};
-  uint64 process_user_ticks_{0};
-  uint64 process_system_ticks_{0};
+  uint64 total_ticks{0};
+  uint64 process_user_ticks{0};
+  uint64 process_system_ticks{0};
 };
-
 Result<CpuStat> cpu_stat() TD_WARN_UNUSED_RESULT;
+
+#if TD_PORT_POSIX
+
+namespace detail {
+Result<Stat> fstat(int native_fd);
+}  // namespace detail
+
+Status update_atime(CSlice path) TD_WARN_UNUSED_RESULT;
 
 struct MemStat {
   uint64 resident_size_ = 0;
@@ -41,14 +48,6 @@ struct MemStat {
 };
 
 Result<MemStat> mem_stat() TD_WARN_UNUSED_RESULT;
-
-#if TD_PORT_POSIX
-
-namespace detail {
-Result<Stat> fstat(int native_fd);
-}  // namespace detail
-
-Status update_atime(CSlice path) TD_WARN_UNUSED_RESULT;
 
 #endif
 

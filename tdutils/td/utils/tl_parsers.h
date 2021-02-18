@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -68,16 +68,6 @@ class TlParser {
     } else {
       left_len -= len;
     }
-  }
-
-  bool can_prefetch_int() const {
-    return get_left_len() >= sizeof(int32);
-  }
-
-  int32 prefetch_int_unsafe() const {
-    int32 result;
-    std::memcpy(&result, data, sizeof(int32));
-    return result;
   }
 
   int32 fetch_int_unsafe() {

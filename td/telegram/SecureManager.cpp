@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -17,7 +17,6 @@
 #include "td/telegram/PasswordManager.h"
 #include "td/telegram/Td.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/buffer.h"
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
@@ -137,7 +136,7 @@ class SetSecureValueErrorsQuery : public Td::ResultHandler {
   void send(tl_object_ptr<telegram_api::InputUser> input_user,
             vector<tl_object_ptr<telegram_api::SecureValueError>> input_errors) {
     send_query(G()->net_query_creator().create(
-        telegram_api::users_setSecureValueErrors(std::move(input_user), std::move(input_errors))));
+        create_storer(telegram_api::users_setSecureValueErrors(std::move(input_user), std::move(input_errors)))));
   }
 
   void on_result(uint64 id, BufferSlice packet) override {
@@ -147,7 +146,7 @@ class SetSecureValueErrorsQuery : public Td::ResultHandler {
     }
 
     bool ptr = result_ptr.move_as_ok();
-    LOG(DEBUG) << "Receive result for SetSecureValueErrorsQuery: " << ptr;
+    LOG(DEBUG) << "Receive result for SetSecureValueErrorsQuery " << ptr;
     promise_.set_value(Unit());
   }
 
@@ -179,7 +178,7 @@ void GetSecureValue::on_error(Status error) {
 
 void GetSecureValue::on_secret(Result<secure_storage::Secret> r_secret, bool dummy) {
   if (r_secret.is_error()) {
-    if (!G()->is_expected_error(r_secret.error())) {
+    if (!G()->close_flag()) {
       LOG(ERROR) << "Receive error instead of secret: " << r_secret.error();
     }
     return on_error(r_secret.move_as_error());
@@ -209,7 +208,7 @@ void GetSecureValue::start_up() {
   std::vector<telegram_api::object_ptr<telegram_api::SecureValueType>> types;
   types.push_back(get_input_secure_value_type(type_));
 
-  auto query = G()->net_query_creator().create(telegram_api::account_getSecureValue(std::move(types)));
+  auto query = G()->net_query_creator().create(create_storer(telegram_api::account_getSecureValue(std::move(types))));
 
   G()->net_query_dispatcher().dispatch_with_callback(std::move(query), actor_shared(this));
 
@@ -258,7 +257,7 @@ void GetAllSecureValues::on_error(Status error) {
 
 void GetAllSecureValues::on_secret(Result<secure_storage::Secret> r_secret, bool dummy) {
   if (r_secret.is_error()) {
-    if (!G()->is_expected_error(r_secret.error())) {
+    if (!G()->close_flag()) {
       LOG(ERROR) << "Receive error instead of secret: " << r_secret.error();
     }
     return on_error(r_secret.move_as_error());
@@ -289,7 +288,7 @@ void GetAllSecureValues::loop() {
 }
 
 void GetAllSecureValues::start_up() {
-  auto query = G()->net_query_creator().create(telegram_api::account_getAllSecureValues());
+  auto query = G()->net_query_creator().create(create_storer(telegram_api::account_getAllSecureValues()));
 
   G()->net_query_dispatcher().dispatch_with_callback(std::move(query), actor_shared(this));
 
@@ -394,7 +393,7 @@ void SetSecureValue::on_error(Status error) {
 
 void SetSecureValue::on_secret(Result<secure_storage::Secret> r_secret, bool x) {
   if (r_secret.is_error()) {
-    if (!G()->is_expected_error(r_secret.error())) {
+    if (!G()->close_flag()) {
       LOG(ERROR) << "Receive error instead of secret: " << r_secret.error();
     }
     return on_error(r_secret.move_as_error());
@@ -546,7 +545,7 @@ void SetSecureValue::start_upload(FileManager *file_manager, FileId &file_id, Se
       auto download_file_id = file_manager->dup_file_id(file_id);
       file_id =
           file_manager
-              ->register_generate(FileType::Secure, FileLocationSource::FromServer, file_view.suggested_path(),
+              ->register_generate(FileType::Secure, FileLocationSource::FromServer, file_view.suggested_name(),
                                   PSTRING() << "#file_id#" << download_file_id.get(), DialogId(), file_view.size())
               .ok();
     }
@@ -573,7 +572,7 @@ void SetSecureValue::loop() {
                                       files_to_upload_, front_side_, reverse_side_, selfie_, translations_to_upload_);
     auto save_secure_value =
         telegram_api::account_saveSecureValue(std::move(input_secure_value), secret_.value().get_hash());
-    auto query = G()->net_query_creator().create(save_secure_value);
+    auto query = G()->net_query_creator().create(create_storer(save_secure_value));
 
     G()->net_query_dispatcher().dispatch_with_callback(std::move(query), actor_shared(this));
     state_ = State::WaitSetValue;
@@ -665,7 +664,8 @@ class DeleteSecureValue : public NetQueryCallback {
   void start_up() override {
     std::vector<telegram_api::object_ptr<telegram_api::SecureValueType>> types;
     types.push_back(get_input_secure_value_type(type_));
-    auto query = G()->net_query_creator().create(telegram_api::account_deleteSecureValue(std::move(types)));
+    auto query =
+        G()->net_query_creator().create(create_storer(telegram_api::account_deleteSecureValue(std::move(types))));
     G()->net_query_dispatcher().dispatch_with_callback(std::move(query), actor_shared(this));
   }
 
@@ -710,7 +710,7 @@ class GetPassportAuthorizationForm : public NetQueryCallback {
   void start_up() override {
     auto account_get_authorization_form =
         telegram_api::account_getAuthorizationForm(bot_user_id_.get(), std::move(scope_), std::move(public_key_));
-    auto query = G()->net_query_creator().create(account_get_authorization_form);
+    auto query = G()->net_query_creator().create(create_storer(account_get_authorization_form));
     G()->net_query_dispatcher().dispatch_with_callback(std::move(query), actor_shared(this));
   }
 
@@ -764,7 +764,7 @@ class GetPassportConfig : public NetQueryCallback {
   Promise<td_api::object_ptr<td_api::text>> promise_;
 
   void start_up() override {
-    auto query = G()->net_query_creator().create(telegram_api::help_getPassportConfig(0));
+    auto query = G()->net_query_creator().create(create_storer(telegram_api::help_getPassportConfig(0)));
     G()->net_query_dispatcher().dispatch_with_callback(std::move(query), actor_shared(this));
   }
 
@@ -1062,7 +1062,7 @@ void SecureManager::on_get_passport_authorization_form_secret(int32 authorizatio
 
   if (r_secret.is_error()) {
     auto error = r_secret.move_as_error();
-    if (!G()->is_expected_error(error)) {
+    if (!G()->close_flag()) {
       LOG(ERROR) << "Receive error instead of secret: " << error;
     }
     if (error.code() <= 0) {
@@ -1269,7 +1269,7 @@ void SecureManager::send_passport_authorization_form(int32 authorization_form_id
   auto td_query = telegram_api::account_acceptAuthorization(
       it->second.bot_user_id.get(), it->second.scope, it->second.public_key, std::move(hashes),
       get_secure_credentials_encrypted_object(r_encrypted_credentials.move_as_ok()));
-  auto query = G()->net_query_creator().create(td_query);
+  auto query = G()->net_query_creator().create(create_storer(td_query));
   auto new_promise =
       PromiseCreator::lambda([promise = std::move(promise)](Result<NetQueryPtr> r_net_query_ptr) mutable {
         auto r_result = fetch_result<telegram_api::account_acceptAuthorization>(std::move(r_net_query_ptr));
@@ -1281,8 +1281,7 @@ void SecureManager::send_passport_authorization_form(int32 authorization_form_id
   send_with_promise(std::move(query), std::move(new_promise));
 }
 
-void SecureManager::get_preferred_country_language(string country_code,
-                                                   Promise<td_api::object_ptr<td_api::text>> promise) {
+void SecureManager::get_preferred_country_code(string country_code, Promise<td_api::object_ptr<td_api::text>> promise) {
   refcnt_++;
   for (auto &c : country_code) {
     c = to_upper(c);

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -39,7 +39,7 @@ class CallbackQueriesManager {
                            tl_object_ptr<telegram_api::inputBotInlineMessageID> &&inline_message_id, BufferSlice &&data,
                            int64 chat_instance, string &&game_short_name);
 
-  int64 send_callback_query(FullMessageId full_message_id, tl_object_ptr<td_api::CallbackQueryPayload> &&payload,
+  int64 send_callback_query(FullMessageId full_message_id, const tl_object_ptr<td_api::CallbackQueryPayload> &payload,
                             Promise<Unit> &&promise);
 
   void on_get_callback_query_answer(int64 result_id, tl_object_ptr<telegram_api::messages_botCallbackAnswer> &&answer);
@@ -59,11 +59,6 @@ class CallbackQueriesManager {
 
   tl_object_ptr<td_api::CallbackQueryPayload> get_query_payload(int32 flags, BufferSlice &&data,
                                                                 string &&game_short_name);
-
-  void send_get_callback_answer_query(FullMessageId full_message_id,
-                                      tl_object_ptr<td_api::CallbackQueryPayload> &&payload,
-                                      tl_object_ptr<telegram_api::InputCheckPasswordSRP> &&password, int64 result_id,
-                                      Promise<Unit> &&promise);
 
   std::unordered_map<int64, CallbackQueryAnswer> callback_query_answers_;
 

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -12,10 +12,6 @@
 #include "td/utils/Time.h"
 
 namespace td {
-
-QueryCombiner::QueryCombiner(Slice name, double min_delay) : next_query_time_(Time::now()), min_delay_(min_delay) {
-  register_actor(name, this).release();
-}
 
 void QueryCombiner::add_query(int64 query_id, Promise<Promise<Unit>> &&send_query, Promise<Unit> &&promise) {
   LOG(INFO) << "Add query " << query_id;

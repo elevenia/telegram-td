@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -12,38 +12,15 @@
 
 namespace td {
 
-Timer::Timer(bool is_paused) {
-  if (!is_paused) {
-    resume();
-  }
-}
-
-void Timer::pause() {
-  if (is_paused_) {
-    return;
-  }
-  elapsed_ += Time::now() - start_time_;
-  is_paused_ = true;
-}
-
-void Timer::resume() {
-  if (!is_paused_) {
-    return;
-  }
-  start_time_ = Time::now();
-  is_paused_ = false;
+Timer::Timer() : start_time_(Time::now()) {
 }
 
 double Timer::elapsed() const {
-  double res = elapsed_;
-  if (!is_paused_) {
-    res += Time::now() - start_time_;
-  }
-  return res;
+  return Time::now() - start_time_;
 }
 
 StringBuilder &operator<<(StringBuilder &string_builder, const Timer &timer) {
-  return string_builder << " in " << format::as_time(timer.elapsed());
+  return string_builder << "in " << Time::now() - timer.start_time_;
 }
 
 PerfWarningTimer::PerfWarningTimer(string name, double max_duration)

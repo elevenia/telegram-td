@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -12,7 +12,6 @@
 #include "td/telegram/FullMessageId.h"
 #include "td/telegram/logevent/LogEvent.h"
 #include "td/telegram/MessageContentType.h"
-#include "td/telegram/MessageCopyOptions.h"
 #include "td/telegram/MessageEntity.h"
 #include "td/telegram/MessageId.h"
 #include "td/telegram/Photo.h"
@@ -61,16 +60,14 @@ struct InputMessageContent {
   bool clear_draft = false;
   int32 ttl = 0;
   UserId via_bot_user_id;
-  string emoji;
 
   InputMessageContent(unique_ptr<MessageContent> &&content, bool disable_web_page_preview, bool clear_draft, int32 ttl,
-                      UserId via_bot_user_id, string emoji)
+                      UserId via_bot_user_id)
       : content(std::move(content))
       , disable_web_page_preview(disable_web_page_preview)
       , clear_draft(clear_draft)
       , ttl(ttl)
-      , via_bot_user_id(via_bot_user_id)
-      , emoji(std::move(emoji)) {
+      , via_bot_user_id(via_bot_user_id) {
   }
 };
 
@@ -114,11 +111,7 @@ tl_object_ptr<telegram_api::InputMedia> get_input_media(const MessageContent *co
                                                         FileId file_id, FileId thumbnail_file_id, int32 ttl,
                                                         bool force);
 
-tl_object_ptr<telegram_api::InputMedia> get_input_media(const MessageContent *content, Td *td, int32 ttl,
-                                                        const string &emoji, bool force);
-
-tl_object_ptr<telegram_api::InputMedia> get_fake_input_media(Td *td, tl_object_ptr<telegram_api::InputFile> input_file,
-                                                             FileId file_id);
+tl_object_ptr<telegram_api::InputMedia> get_input_media(const MessageContent *content, Td *td, int32 ttl, bool force);
 
 void delete_message_content_thumbnail(MessageContent *content, Td *td);
 
@@ -126,7 +119,7 @@ bool can_forward_message_content(const MessageContent *content);
 
 bool update_opened_message_content(MessageContent *content);
 
-int32 get_message_content_index_mask(const MessageContent *content, const Td *td, bool is_outgoing);
+int32 get_message_content_index_mask(const MessageContent *content, const Td *td, bool is_secret, bool is_outgoing);
 
 MessageId get_message_content_pinned_message_id(const MessageContent *content);
 
@@ -141,8 +134,6 @@ int32 get_message_content_live_location_period(const MessageContent *content);
 bool get_message_content_poll_is_closed(const Td *td, const MessageContent *content);
 
 bool get_message_content_poll_is_anonymous(const Td *td, const MessageContent *content);
-
-bool has_message_content_web_page(const MessageContent *content);
 
 void remove_message_content_web_page(MessageContent *content);
 
@@ -162,13 +153,12 @@ void merge_message_contents(Td *td, const MessageContent *old_content, MessageCo
 
 bool merge_message_content_file_id(Td *td, MessageContent *message_content, FileId new_file_id);
 
-void register_message_content(Td *td, const MessageContent *content, FullMessageId full_message_id, const char *source);
+void register_message_content(Td *td, const MessageContent *content, FullMessageId full_message_id);
 
 void reregister_message_content(Td *td, const MessageContent *old_content, const MessageContent *new_content,
-                                FullMessageId full_message_id, const char *source);
+                                FullMessageId full_message_id);
 
-void unregister_message_content(Td *td, const MessageContent *content, FullMessageId full_message_id,
-                                const char *source);
+void unregister_message_content(Td *td, const MessageContent *content, FullMessageId full_message_id);
 
 unique_ptr<MessageContent> get_secret_message_content(
     Td *td, string message_text, tl_object_ptr<telegram_api::encryptedFile> file,
@@ -181,10 +171,10 @@ unique_ptr<MessageContent> get_message_content(Td *td, FormattedText message_tex
                                                DialogId owner_dialog_id, bool is_content_read, UserId via_bot_user_id,
                                                int32 *ttl);
 
-enum class MessageContentDupType : int32 { Send, SendViaBot, Forward, Copy };
+enum class MessageContentDupType : int32 { Send, SendViaBot, Forward, Copy, CopyWithoutCaption };
 
 unique_ptr<MessageContent> dup_message_content(Td *td, DialogId dialog_id, const MessageContent *content,
-                                               MessageContentDupType type, MessageCopyOptions &&copy_options);
+                                               MessageContentDupType type);
 
 unique_ptr<MessageContent> get_action_message_content(Td *td, tl_object_ptr<telegram_api::MessageAction> &&action,
                                                       DialogId owner_dialog_id, MessageId reply_to_message_id);

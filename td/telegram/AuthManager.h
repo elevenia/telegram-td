@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -28,9 +28,9 @@ class AuthManager : public NetActor {
   AuthManager(int32 api_id, const string &api_hash, ActorShared<> parent);
 
   bool is_bot() const;
+  void set_is_bot(bool is_bot);
 
   bool is_authorized() const;
-  bool was_authorized() const;
   void get_state(uint64 query_id);
 
   void set_phone_number(uint64 query_id, string phone_number,
@@ -43,7 +43,7 @@ class AuthManager : public NetActor {
   void check_password(uint64 query_id, string password);
   void request_password_recovery(uint64 query_id);
   void recover_password(uint64 query_id, string code);
-  void log_out(uint64 query_id);
+  void logout(uint64 query_id);
   void delete_account(uint64 query_id, const string &reason);
 
   void on_update_login_token();
@@ -217,8 +217,6 @@ class AuthManager : public NetActor {
   static void on_update_login_token_static(void *td);
   void send_export_login_token_query();
   void set_login_token_expires_at(double login_token_expires_at);
-
-  void send_log_out_query();
   void destroy_auth_keys();
 
   void on_send_code_result(NetQueryPtr &result);

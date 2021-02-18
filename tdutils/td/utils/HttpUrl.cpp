@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -10,17 +10,16 @@
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
 #include "td/utils/Parser.h"
-#include "td/utils/port/IPAddress.h"
 
 namespace td {
 
 string HttpUrl::get_url() const {
   string result;
   switch (protocol_) {
-    case Protocol::Http:
+    case Protocol::HTTP:
       result += "http://";
       break;
-    case Protocol::Https:
+    case Protocol::HTTPS:
       result += "https://";
       break;
     default:
@@ -30,7 +29,13 @@ string HttpUrl::get_url() const {
     result += userinfo_;
     result += '@';
   }
+  if (is_ipv6_) {
+    result += '[';
+  }
   result += host_;
+  if (is_ipv6_) {
+    result += ']';
+  }
   if (specified_port_ > 0) {
     result += ':';
     result += to_string(specified_port_);
@@ -43,14 +48,15 @@ string HttpUrl::get_url() const {
 Result<HttpUrl> parse_url(Slice url, HttpUrl::Protocol default_protocol) {
   // url == [https?://][userinfo@]host[:port]
   ConstParser parser(url);
-  string protocol_str = to_lower(parser.read_till_nofail(":/?#@[]"));
+  string protocol_str = to_lower(parser.read_till_nofail(':'));
 
   HttpUrl::Protocol protocol;
-  if (parser.try_skip("://")) {
+  if (parser.start_with("://")) {
+    parser.advance(3);
     if (protocol_str == "http") {
-      protocol = HttpUrl::Protocol::Http;
+      protocol = HttpUrl::Protocol::HTTP;
     } else if (protocol_str == "https") {
-      protocol = HttpUrl::Protocol::Https;
+      protocol = HttpUrl::Protocol::HTTPS;
     } else {
       return Status::Error("Unsupported URL protocol");
     }
@@ -82,11 +88,8 @@ Result<HttpUrl> parse_url(Slice url, HttpUrl::Protocol default_protocol) {
 
   bool is_ipv6 = false;
   if (!host.empty() && host[0] == '[' && host.back() == ']') {
-    IPAddress ip_address;
-    if (ip_address.init_ipv6_port(host.str(), 1).is_error()) {
-      return Status::Error("Wrong IPv6 address specified in the URL");
-    }
-    CHECK(ip_address.is_ipv6());
+    host.remove_prefix(1);
+    host.remove_suffix(1);
     is_ipv6 = true;
   }
   if (host.empty()) {
@@ -98,10 +101,10 @@ Result<HttpUrl> parse_url(Slice url, HttpUrl::Protocol default_protocol) {
 
   int specified_port = port;
   if (port == 0) {
-    if (protocol == HttpUrl::Protocol::Http) {
+    if (protocol == HttpUrl::Protocol::HTTP) {
       port = 80;
     } else {
-      CHECK(protocol == HttpUrl::Protocol::Https);
+      CHECK(protocol == HttpUrl::Protocol::HTTPS);
       port = 443;
     }
   }
@@ -168,7 +171,7 @@ Result<HttpUrl> parse_url(Slice url, HttpUrl::Protocol default_protocol) {
 }
 
 StringBuilder &operator<<(StringBuilder &sb, const HttpUrl &url) {
-  sb << tag("protocol", url.protocol_ == HttpUrl::Protocol::Http ? "HTTP" : "HTTPS") << tag("userinfo", url.userinfo_)
+  sb << tag("protocol", url.protocol_ == HttpUrl::Protocol::HTTP ? "HTTP" : "HTTPS") << tag("userinfo", url.userinfo_)
      << tag("host", url.host_) << tag("port", url.port_) << tag("query", url.query_);
   return sb;
 }

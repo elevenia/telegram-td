@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -12,8 +12,6 @@
 #include "td/telegram/NotificationGroupKey.h"
 
 #include "td/actor/PromiseFuture.h"
-
-#include "td/db/KeyValueSyncInterface.h"
 
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
@@ -96,8 +94,7 @@ class DialogDbAsyncInterface {
   virtual void close(Promise<> promise) = 0;
 };
 
-Status init_dialog_db(SqliteDb &db, int version, KeyValueSyncInterface &binlog_pmc,
-                      bool &was_created) TD_WARN_UNUSED_RESULT;
+Status init_dialog_db(SqliteDb &db, int version, bool &was_created) TD_WARN_UNUSED_RESULT;
 Status drop_dialog_db(SqliteDb &db, int version) TD_WARN_UNUSED_RESULT;
 
 std::shared_ptr<DialogDbSyncSafeInterface> create_dialog_db_sync(

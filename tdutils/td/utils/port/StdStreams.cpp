@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -10,10 +10,8 @@
 #include "td/utils/misc.h"
 #include "td/utils/port/detail/Iocp.h"
 #include "td/utils/port/detail/NativeFd.h"
-#include "td/utils/port/detail/PollableFd.h"
 #include "td/utils/port/PollFlags.h"
 #include "td/utils/port/thread.h"
-#include "td/utils/ScopeGuard.h"
 #include "td/utils/Slice.h"
 
 #include <atomic>
@@ -103,7 +101,7 @@ class BufferedStdinImpl : public Iocp::Callback {
   }
 
   Result<size_t> flush_read(size_t max_read = std::numeric_limits<size_t>::max()) TD_WARN_UNUSED_RESULT {
-    info_.sync_with_poll();
+    info_.get_flags();
     info_.clear_flags(PollFlags::Read());
     reader_.sync_with_writer();
     return reader_.size();
@@ -127,13 +125,11 @@ class BufferedStdinImpl : public Iocp::Callback {
         break;
       }
       writer_.confirm_append(r_size.ok());
-      inc_refcnt();
-      if (!iocp_ref_.post(0, this, nullptr)) {
-        dec_refcnt();
+      if (iocp_ref_.post(0, this, nullptr)) {
+        inc_refcnt();
       }
     }
     if (!iocp_ref_.post(0, this, nullptr)) {
-      read_thread_.detach();
       dec_refcnt();
     }
   }
@@ -199,10 +195,8 @@ class BufferedStdinImpl {
 
   Result<size_t> flush_read(size_t max_read = std::numeric_limits<size_t>::max()) TD_WARN_UNUSED_RESULT {
     size_t result = 0;
-    ::td::sync_with_poll(*this);
-    while (::td::can_read_local(*this) && max_read) {
-      MutableSlice slice = writer_.prepare_append();
-      slice.truncate(max_read);
+    while (::td::can_read(*this) && max_read) {
+      MutableSlice slice = writer_.prepare_append().truncate(max_read);
       TRY_RESULT(x, file_fd_.read(slice));
       slice.truncate(x);
       writer_.confirm_append(x);

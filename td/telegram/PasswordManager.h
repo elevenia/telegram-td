@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -30,7 +30,7 @@ struct TempPasswordState {
   string temp_password;
   int32 valid_until = 0;  // unix_time
 
-  tl_object_ptr<td_api::temporaryPasswordState> get_temporary_password_state_object() const;
+  tl_object_ptr<td_api::temporaryPasswordState> as_td_api() const;
 
   template <class StorerT>
   void store(StorerT &storer) const {
@@ -89,6 +89,8 @@ class PasswordManager : public NetQueryCallback {
 
   static TempPasswordState get_temp_password_state_sync();
 
+  // void get_ton_wallet_password_salt(Promise<td_api::object_ptr<td_api::tonWalletPasswordSalt>> promise);
+
  private:
   static constexpr size_t MIN_NEW_SALT_SIZE = 8;
   static constexpr size_t MIN_NEW_SECURE_SALT_SIZE = 8;
@@ -116,7 +118,7 @@ class PasswordManager : public NetQueryCallback {
 
     string new_secure_salt;
 
-    State get_password_state_object() const {
+    State as_td_api() const {
       td_api::object_ptr<td_api::emailAddressAuthenticationCodeInfo> code_info;
       if (!unconfirmed_recovery_email_address_pattern.empty()) {
         code_info = td_api::make_object<td_api::emailAddressAuthenticationCodeInfo>(
@@ -151,7 +153,7 @@ class PasswordManager : public NetQueryCallback {
   };
 
   optional<secure_storage::Secret> secret_;
-  double secret_expire_time_ = 0;
+  double secret_expire_date_ = 0;
 
   TempPasswordState temp_password_state_;
   Promise<TempState> create_temp_password_promise_;
@@ -159,6 +161,9 @@ class PasswordManager : public NetQueryCallback {
   string last_verified_email_address_;
 
   int32 last_code_length_ = 0;
+
+  // string ton_wallet_password_salt_;
+  // vector<Promise<td_api::object_ptr<td_api::tonWalletPasswordSalt>>> get_ton_wallet_password_salt_queries_;
 
   static Result<secure_storage::Secret> decrypt_secure_secret(
       Slice password, tl_object_ptr<telegram_api::SecurePasswordKdfAlgo> algo_ptr, Slice secret, int64 secret_id);
@@ -185,6 +190,8 @@ class PasswordManager : public NetQueryCallback {
   void do_create_temp_password(string password, int32 timeout, PasswordState &&password_state,
                                Promise<TempPasswordState> promise);
   void on_finish_create_temp_password(Result<TempPasswordState> result, bool dummy);
+
+  // void on_get_ton_wallet_password_salt(Result<telegram_api::object_ptr<telegram_api::wallet_secretSalt>> result);
 
   void on_result(NetQueryPtr query) override;
 

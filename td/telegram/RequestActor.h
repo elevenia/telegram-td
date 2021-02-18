@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -30,15 +30,13 @@ class RequestActor : public Actor {
   }
 
   void loop() override {
-    PromiseActor<T> promise_actor;
+    PromiseActor<T> promise;
     FutureActor<T> future;
-    init_promise_future(&promise_actor, &future);
+    init_promise_future(&promise, &future);
 
-    auto promise = PromiseCreator::from_promise_actor(std::move(promise_actor));
-    do_run(std::move(promise));
+    do_run(PromiseCreator::from_promise_actor(std::move(promise)));
 
     if (future.is_ready()) {
-      CHECK(!promise);
       if (future.is_error()) {
         do_send_error(future.move_as_error());
       } else {
@@ -47,11 +45,9 @@ class RequestActor : public Actor {
       }
       stop();
     } else {
-      CHECK(!future.empty());
-      CHECK(future.get_state() == FutureActor<T>::State::Waiting);
       if (--tries_left_ == 0) {
         future.close();
-        do_send_error(Status::Error(500, "Requested data is inaccessible"));
+        do_send_error(Status::Error(400, "Requested data is inaccessible"));
         return stop();
       }
 
@@ -63,13 +59,13 @@ class RequestActor : public Actor {
   void raw_event(const Event::Raw &event) override {
     if (future_.is_error()) {
       auto error = future_.move_as_error();
-      if (error == Status::Error<FutureActor<T>::HANGUP_ERROR_CODE>()) {
+      if (error == Status::Error<FutureActor<T>::Hangup>()) {
         // dropping query due to lost authorization or lost promise
         // td may be already closed, so we should check is auth_manager_ is empty
         bool is_authorized = td->auth_manager_ && td->auth_manager_->is_authorized();
         if (is_authorized) {
           LOG(ERROR) << "Promise was lost";
-          do_send_error(Status::Error(500, "Query can't be answered due to a bug in TDLib"));
+          do_send_error(Status::Error(500, "Query can't be answered due to bug in the TDLib"));
         } else {
           do_send_error(Status::Error(401, "Unauthorized"));
         }

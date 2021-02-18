@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -75,7 +75,7 @@ class Actor : public ObserverBase {
 
   uint64 get_link_token();
   std::shared_ptr<ActorContext> set_context(std::shared_ptr<ActorContext> context);
-  string set_tag(string tag);
+  CSlice set_tag(CSlice tag);
 
   void always_wait_for_mailbox();
 
@@ -101,6 +101,7 @@ class Actor : public ObserverBase {
   template <class SelfT>
   ActorId<SelfT> actor_id(SelfT *self);
 
+  ActorShared<> actor_shared();
   template <class SelfT>
   ActorShared<SelfT> actor_shared(SelfT *self, uint64 id = static_cast<uint64>(-1));
 

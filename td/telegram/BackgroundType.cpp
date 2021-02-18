@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -136,7 +136,7 @@ StringBuilder &operator<<(StringBuilder &string_builder, const BackgroundType &t
 
 Result<BackgroundType> get_background_type(const td_api::BackgroundType *type) {
   if (type == nullptr) {
-    return Status::Error(400, "Type must be non-empty");
+    return Status::Error(400, "Type must not be empty");
   }
 
   BackgroundType result;
@@ -149,7 +149,7 @@ Result<BackgroundType> get_background_type(const td_api::BackgroundType *type) {
     case td_api::backgroundTypePattern::ID: {
       auto pattern = static_cast<const td_api::backgroundTypePattern *>(type);
       if (pattern->fill_ == nullptr) {
-        return Status::Error(400, "Fill info must be non-empty");
+        return Status::Error(400, "Fill info must not be empty");
       }
       result = BackgroundType(pattern->is_moving_, get_background_fill(pattern->fill_.get()), pattern->intensity_);
       break;
@@ -157,7 +157,7 @@ Result<BackgroundType> get_background_type(const td_api::BackgroundType *type) {
     case td_api::backgroundTypeFill::ID: {
       auto fill = static_cast<const td_api::backgroundTypeFill *>(type);
       if (fill->fill_ == nullptr) {
-        return Status::Error(400, "Fill info must be non-empty");
+        return Status::Error(400, "Fill info must not be empty");
       }
       result = BackgroundType(get_background_fill(fill->fill_.get()));
       break;

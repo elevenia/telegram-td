@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -14,14 +14,18 @@ namespace td {
 
 bool DialogId::is_valid() const {
   switch (get_type()) {
-    case DialogType::User:
+    case DialogType::User: {
       return get_user_id().is_valid();
-    case DialogType::Chat:
+    }
+    case DialogType::Chat: {
       return get_chat_id().is_valid();
-    case DialogType::Channel:
+    }
+    case DialogType::Channel: {
       return get_channel_id().is_valid();
-    case DialogType::SecretChat:
+    }
+    case DialogType::SecretChat: {
       return get_secret_chat_id().is_valid();
+    }
     case DialogType::None:
       return false;
     default:

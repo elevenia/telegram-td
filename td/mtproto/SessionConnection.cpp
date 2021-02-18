@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -13,12 +13,12 @@
 #include "td/mtproto/Transport.h"
 #include "td/mtproto/utils.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/as.h"
 #include "td/utils/common.h"
 #include "td/utils/format.h"
 #include "td/utils/Gzip.h"
 #include "td/utils/logging.h"
+#include "td/utils/misc.h"
 #include "td/utils/Random.h"
 #include "td/utils/ScopeGuard.h"
 #include "td/utils/Time.h"
@@ -32,9 +32,6 @@
 #include <type_traits>
 
 namespace td {
-
-int VERBOSITY_NAME(mtproto) = VERBOSITY_NAME(DEBUG) + 7;
-
 namespace mtproto_api {
 
 const int32 msg_container::ID;
@@ -676,7 +673,7 @@ Status SessionConnection::on_raw_packet(const PacketInfo &info, BufferSlice pack
   }
   if (status.is_error()) {
     if (status.code() == 1) {
-      LOG(INFO) << "Packet ignored: " << status;
+      LOG(WARNING) << "Packet ignored " << status;
       send_ack(info.message_id);
       return Status::OK();
     } else if (status.code() == 2) {
@@ -827,11 +824,6 @@ void SessionConnection::send_ack(uint64 message_id) {
   // an easiest way to eliminate duplicated acks for gzipped packets
   if (to_ack_.empty() || to_ack_.back() != ack) {
     to_ack_.push_back(ack);
-
-    constexpr size_t MAX_UNACKED_PACKETS = 100;
-    if (to_ack_.size() >= MAX_UNACKED_PACKETS) {
-      send_before(Time::now_cached());
-    }
   }
 }
 
@@ -978,8 +970,8 @@ void SessionConnection::flush_packet() {
     }
   }
 
-  if (to_send_.empty() && to_ack_.empty() && to_get_state_info_.empty() && to_resend_answer_.empty() &&
-      to_cancel_answer_.empty()) {
+  to_ack_.clear();
+  if (to_send_.empty()) {
     force_send_at_ = 0;
   }
 }

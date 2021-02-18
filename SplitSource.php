@@ -39,9 +39,9 @@ function split_file($file, $chunks, $undo) {
     $cmake_new_files = $new_files;
     if ($is_generated) {
         foreach ($cmake_new_files as &$file_ref) {
-            $file_ref = str_replace('td/generate/auto/td', '${TD_AUTO_INCLUDE_DIR}', $file_ref);
+            $file_ref = str_replace('td/generate', '${CMAKE_CURRENT_SOURCE_DIR}', $file_ref);
         }
-        $cmake_cpp_name = str_replace('td/generate/auto/td', '${TD_AUTO_INCLUDE_DIR}', $cmake_cpp_name);
+        $cmake_cpp_name = str_replace('td/generate', '${CMAKE_CURRENT_SOURCE_DIR}', $cmake_cpp_name);
     }
 
     if ($undo) {
@@ -156,7 +156,6 @@ function split_file($file, $chunks, $undo) {
                            '(?<name>[A-Z][A-Za-z]*) : public (Td::ResultHandler|NetActor|Request)|'.
                            '(CREATE_REQUEST|CREATE_NO_ARGS_REQUEST)[(](?<name>[A-Z][A-Za-z]*)|'.
                            '(?<name>complete_pending_preauthentication_requests)|'.
-                           '(?<name>get_message_history_slice)|'.
                            '(Up|Down)load[a-zA-Z]*C(?<name>allback)|(up|down)load_[a-z_]*_c(?<name>allback)_|'.
                            '(?<name>lazy_to_json)|'.
                            '(?<name>LogEvent)[^sA]|'.
@@ -274,8 +273,7 @@ function split_file($file, $chunks, $undo) {
                 'HashtagHints' => 'HashtagHints',
                 'inline_queries_manager[_(-][^.]|InlineQueriesManager' => 'InlineQueriesManager',
                 'language_pack_manager[_(-][^.]|LanguagePackManager' => 'LanguagePackManager',
-                'LogeventIdWithGeneration|add_log_event|delete_log_event|get_erase_log_event_promise|parse_time|store_time' => 'logevent/LogEventHelper',
-                'MessageCopyOptions' => 'MessageCopyOptions',
+                'get_erase_logevent_promise|parse_time|store_time' => 'logevent/LogEventHelper',
                 'messages_manager[_(-][^.]|MessagesManager' => 'MessagesManager',
                 'notification_manager[_(-][^.]|NotificationManager|notifications[)]' => 'NotificationManager',
                 'PublicDialogType|get_public_dialog_type' => 'PublicDialogType',
@@ -283,7 +281,7 @@ function split_file($file, $chunks, $undo) {
                 'secret_chats_manager[_(-][^.]|SecretChatsManager' => 'SecretChatsManager',
                 'stickers_manager[_(-][^.]|StickersManager' => 'StickersManager',
                 '[>](td_db[(][)]|get_td_db_impl[(])|TdDb[^A-Za-z]' => 'TdDb',
-                'TopDialogCategory|get_top_dialog_category' => 'TopDialogCategory',
+                'TopDialogCategory|top_dialog_category_from_td_api' => 'TopDialogCategory',
                 'top_dialog_manager[_(-][^.]|TopDialogManager' => 'TopDialogManager',
                 'updates_manager[_(-][^.]|UpdatesManager|get_difference[)]' => 'UpdatesManager',
                 'WebPageId(Hash)?' => 'WebPageId',

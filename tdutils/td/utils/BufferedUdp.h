@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -36,7 +36,7 @@ class UdpWriter {
     }
 
     size_t cnt;
-    auto status = fd.send_messages(Span<UdpSocketFd::OutboundMessage>(messages).truncate(to_send_n), cnt);
+    auto status = fd.send_messages(::td::Span<UdpSocketFd::OutboundMessage>(messages).truncate(to_send_n), cnt);
     queue.pop_n(cnt);
     return status;
   }
@@ -51,7 +51,7 @@ class UdpReaderHelper {
       buffer_ = BufferSlice(RESERVED_SIZE);
     }
     CHECK(buffer_.size() >= MAX_PACKET_SIZE);
-    message.data = buffer_.as_slice().substr(0, MAX_PACKET_SIZE);
+    message.data = buffer_.as_slice().truncate(MAX_PACKET_SIZE);
   }
 
   UdpMessage extract_udp_message(UdpSocketFd::InboundMessage &message) {
@@ -64,8 +64,7 @@ class UdpReaderHelper {
   }
 
  private:
-  static constexpr size_t MAX_PACKET_SIZE = 2048;
-  static constexpr size_t RESERVED_SIZE = MAX_PACKET_SIZE * 8;
+  enum : size_t { MAX_PACKET_SIZE = 2048, RESERVED_SIZE = MAX_PACKET_SIZE * 8 };
   UdpMessage message_;
   BufferSlice buffer_;
 };
@@ -99,7 +98,7 @@ class UdpReader {
   }
 
  private:
-  static constexpr size_t BUFFER_SIZE = 16;
+  enum : size_t { BUFFER_SIZE = 16 };
   std::array<UdpSocketFd::InboundMessage, BUFFER_SIZE> messages_;
   std::array<UdpReaderHelper, BUFFER_SIZE> helpers_;
 };
@@ -114,11 +113,8 @@ class BufferedUdp : public UdpSocketFd {
   }
 
 #if TD_PORT_POSIX
-  void sync_with_poll() {
-    ::td::sync_with_poll(*this);
-  }
   Result<optional<UdpMessage>> receive() {
-    if (input_.empty() && can_read_local(*this)) {
+    if (input_.empty() && can_read(*this)) {
       TRY_STATUS(flush_read_once());
     }
     if (input_.empty()) {
@@ -133,7 +129,7 @@ class BufferedUdp : public UdpSocketFd {
 
   Status flush_send() {
     Status status;
-    while (status.is_ok() && can_write_local(*this) && !output_.empty()) {
+    while (status.is_ok() && can_write(*this) && !output_.empty()) {
       status = flush_send_once();
     }
     return status;

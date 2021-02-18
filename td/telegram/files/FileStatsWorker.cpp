@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -31,7 +31,6 @@
 
 #include <functional>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace td {
 namespace {
@@ -58,7 +57,7 @@ void scan_db(CancellationToken &token, CallbackT &&callback) {
     if (value.substr(0, 2) == "@@") {
       return true;
     }
-    log_event::WithVersion<TlParser> parser(value);
+    logevent::WithVersion<TlParser> parser(value);
     FileData data;
     data.parse(parser, false);
     if (parser.get_status().is_error()) {
@@ -101,15 +100,13 @@ struct FsFileInfo {
 
 template <class CallbackT>
 void scan_fs(CancellationToken &token, CallbackT &&callback) {
-  std::unordered_set<string> scanned_file_dirs;
-  for (int32 i = 0; i < MAX_FILE_TYPE; i++) {
+  for (int32 i = 0; i < file_type_size; i++) {
     auto file_type = static_cast<FileType>(i);
-    auto file_dir = get_files_dir(file_type);
-    if (!scanned_file_dirs.insert(file_dir).second) {
+    if (file_type == FileType::SecureRaw || file_type == FileType::Wallpaper) {
       continue;
     }
-    auto main_file_type = get_main_file_type(file_type);
-    walk_path(file_dir, [&](CSlice path, WalkPath::Type type) {
+    auto files_dir = get_files_dir(file_type);
+    walk_path(files_dir, [&](CSlice path, WalkPath::Type type) {
       if (token) {
         return WalkPath::Action::Abort;
       }
@@ -122,7 +119,7 @@ void scan_fs(CancellationToken &token, CallbackT &&callback) {
         return WalkPath::Action::Continue;
       }
       auto stat = r_stat.move_as_ok();
-      if (stat.size_ == 0 && ends_with(path, "/.nomedia")) {
+      if (ends_with(path, "/.nomedia") && stat.size_ == 0) {
         // skip .nomedia file
         return WalkPath::Action::Continue;
       }
@@ -130,7 +127,7 @@ void scan_fs(CancellationToken &token, CallbackT &&callback) {
       FsFileInfo info;
       info.path = path.str();
       info.size = stat.real_size_;
-      info.file_type = main_file_type;
+      info.file_type = file_type;
       info.atime_nsec = stat.atime_nsec_;
       info.mtime_nsec = stat.mtime_nsec_;
       callback(info);

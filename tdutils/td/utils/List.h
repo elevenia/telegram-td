@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -28,19 +28,19 @@ struct ListNode {
     if (other.empty()) {
       clear();
     } else {
-      init_from(std::move(other));
+      ListNode *head = other.prev;
+      other.remove();
+      head->put(this);
     }
   }
 
   ListNode &operator=(ListNode &&other) {
-    if (this == &other) {
-      return *this;
-    }
-
     this->remove();
 
     if (!other.empty()) {
-      init_from(std::move(other));
+      ListNode *head = other.prev;
+      other.remove();
+      head->put(this);
     }
 
     return *this;
@@ -58,12 +58,11 @@ struct ListNode {
   }
 
   void put(ListNode *other) {
-    DCHECK(other->empty());
-    put_unsafe(other);
+    other->connect(next);
+    this->connect(other);
   }
 
   void put_back(ListNode *other) {
-    DCHECK(other->empty());
     prev->connect(other);
     other->connect(this);
   }
@@ -83,34 +82,10 @@ struct ListNode {
     return next == this;
   }
 
-  ListNode *begin() {
-    return next;
-  }
-  ListNode *end() {
-    return this;
-  }
-  ListNode *get_next() {
-    return next;
-  }
-  ListNode *get_prev() {
-    return prev;
-  }
-
- protected:
+ private:
   void clear() {
     next = this;
     prev = this;
-  }
-
-  void init_from(ListNode &&other) {
-    ListNode *head = other.prev;
-    other.remove();
-    head->put_unsafe(this);
-  }
-
-  void put_unsafe(ListNode *other) {
-    other->connect(next);
-    this->connect(other);
   }
 };
 

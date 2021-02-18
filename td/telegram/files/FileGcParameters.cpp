@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -10,7 +10,6 @@
 #include "td/telegram/Global.h"
 
 #include "td/utils/format.h"
-#include "td/utils/misc.h"
 
 namespace td {
 
@@ -22,17 +21,16 @@ FileGcParameters::FileGcParameters(int64 size, int32 ttl, int32 count, int32 imm
     , exclude_owner_dialog_ids(std::move(exclude_owner_dialog_ids))
     , dialog_limit(dialog_limit) {
   auto &config = G()->shared_config();
-  this->max_files_size = size >= 0 ? size : config.get_option_integer("storage_max_files_size", 100 << 10) << 10;
+  this->max_files_size =
+      size >= 0 ? size : static_cast<int64>(config.get_option_integer("storage_max_files_size", 100 << 10)) << 10;
 
   this->max_time_from_last_access =
-      ttl >= 0 ? ttl : narrow_cast<int32>(config.get_option_integer("storage_max_time_from_last_access", 60 * 60 * 23));
+      ttl >= 0 ? ttl : config.get_option_integer("storage_max_time_from_last_access", 60 * 60 * 23);
 
-  this->max_file_count =
-      count >= 0 ? count : narrow_cast<int32>(config.get_option_integer("storage_max_file_count", 40000));
+  this->max_file_count = count >= 0 ? count : config.get_option_integer("storage_max_file_count", 40000);
 
-  this->immunity_delay = immunity_delay >= 0
-                             ? immunity_delay
-                             : narrow_cast<int32>(config.get_option_integer("storage_immunity_delay", 60 * 60));
+  this->immunity_delay =
+      immunity_delay >= 0 ? immunity_delay : config.get_option_integer("storage_immunity_delay", 60 * 60);
 }
 
 StringBuilder &operator<<(StringBuilder &string_builder, const FileGcParameters &parameters) {

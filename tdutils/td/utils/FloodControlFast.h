@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -13,16 +13,16 @@ namespace td {
 
 class FloodControlFast {
  public:
-  void add_event(int32 now) {
+  uint32 add_event(int32 now) {
     for (auto &limit : limits_) {
       limit.stat_.add_event(CounterStat::Event(), now);
       if (limit.stat_.get_stat(now).count_ > limit.count_) {
         wakeup_at_ = max(wakeup_at_, now + limit.duration_ * 2);
       }
     }
+    return wakeup_at_;
   }
-
-  uint32 get_wakeup_at() const {
+  uint32 get_wakeup_at() {
     return wakeup_at_;
   }
 

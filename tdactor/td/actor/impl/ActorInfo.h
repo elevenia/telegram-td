@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -40,7 +40,6 @@ inline void ActorInfo::init(int32 sched_id, Slice name, ObjectPool<ActorInfo>::O
 
   if (!is_lite) {
     context_ = Scheduler::context()->this_ptr_.lock();
-    VLOG(actor) << "Set context " << context_.get() << " for " << name;
 #ifdef TD_DEBUG
     name_ = name.str();
 #endif
@@ -78,7 +77,6 @@ inline void ActorInfo::clear() {
   // NB: must be in non migrating state
   // store invalid scheduler id.
   sched_id_.store((1 << 30) - 1, std::memory_order_relaxed);
-  VLOG(actor) << "Clear context " << context_.get() << " for " << get_name();
   context_.reset();
 }
 
@@ -148,9 +146,7 @@ inline const Actor *ActorInfo::get_actor_unsafe() const {
 inline std::shared_ptr<ActorContext> ActorInfo::set_context(std::shared_ptr<ActorContext> context) {
   CHECK(is_running());
   context->this_ptr_ = context;
-  if (Scheduler::context()->tag_) {
-    context->set_tag(Scheduler::context()->tag_);
-  }
+  context->tag_ = Scheduler::context()->tag_;
   std::swap(context_, context);
   Scheduler::context() = context_.get();
   Scheduler::on_context_updated();
@@ -179,9 +175,7 @@ inline void ActorInfo::start_run() {
 }
 inline void ActorInfo::finish_run() {
   is_running_ = false;
-  if (!empty()) {
-    VLOG(actor) << "Stop run actor: " << *this;
-  }
+  VLOG(actor) << "Stop run actor: " << *this;
 }
 
 inline bool ActorInfo::is_running() const {

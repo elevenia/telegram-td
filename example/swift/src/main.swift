@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -9,7 +9,8 @@ import Foundation
 
 // TDLib Client Swift binding
 class TdClient {
-    var client_id = td_create_client_id()
+    typealias Client = UnsafeMutableRawPointer
+    var client = td_json_client_create()!
     let tdlibMainLoop = DispatchQueue(label: "TDLib")
     let tdlibQueryQueue = DispatchQueue(label: "TDLibQuery")
     var queryF = Dictionary<Int64, (Dictionary<String,Any>)->()>()
@@ -26,7 +27,7 @@ class TdClient {
                 self.queryF[nextQueryId] = f
                 self.queryId = nextQueryId
             }
-            td_send(self.client_id, to_json(newQuery))
+            td_json_client_send(self.client, to_json(newQuery))
         }
     }
 
@@ -45,6 +46,7 @@ class TdClient {
     }
 
     deinit {
+        td_json_client_destroy(client)
     }
 
     func run(updateHandler: @escaping (Dictionary<String,Any>)->()) {
@@ -52,7 +54,7 @@ class TdClient {
         tdlibMainLoop.async { [weak self] in
             while (true) {
                 if let s = self {
-                    if let res = td_receive(10) {
+                    if let res = td_json_client_receive(s.client, 10) {
                         let event = String(cString: res)
                         s.queryResultAsync(event)
                     }
@@ -89,10 +91,10 @@ func to_json(_ obj: Any) -> String {
 }
 
 
-var client = TdClient()
+// An example of usage
+td_set_log_verbosity_level(1);
 
-// start the client by sending request to it
-client.queryAsync(query: ["@type":"getOption", "name":"version"])
+var client = TdClient()
 
 func myReadLine() -> String {
     while (true) {
@@ -115,13 +117,14 @@ func updateAuthorizationState(authorizationState: Dictionary<String, Any>) {
                     "api_hash":"a3406de8d171bb422bb6ddf3bbd800e2",
                     "system_language_code":"en",
                     "device_model":"Desktop",
+                    "system_version":"Unknown",
                     "application_version":"1.0",
                     "enable_storage_optimizer":true
                 ]
             ]);
 
         case "authorizationStateWaitEncryptionKey":
-            client.queryAsync(query: ["@type":"checkDatabaseEncryptionKey", "encryption_key":""])
+            client.queryAsync(query: ["@type":"checkDatabaseEncryptionKey", "key":"cucumber"])
 
         case "authorizationStateWaitPhoneNumber":
             print("Enter your phone number: ")
@@ -157,7 +160,7 @@ func updateAuthorizationState(authorizationState: Dictionary<String, Any>) {
         case "authorizationStateClosing":
             print("Closing...")
 
-        case "authorizationStateClosed":
+        case "authorizationStateLoggingOut":
             print("Closed.")
 
         default:

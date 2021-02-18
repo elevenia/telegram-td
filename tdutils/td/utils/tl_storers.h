@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,7 +8,6 @@
 
 #include "td/utils/common.h"
 #include "td/utils/logging.h"
-#include "td/utils/SharedSlice.h"
 #include "td/utils/Slice.h"
 #include "td/utils/StorerBase.h"
 #include "td/utils/UInt.h"
@@ -143,10 +142,12 @@ class TlStorerCalcLength {
 
 class TlStorerToString {
   std::string result;
-  size_t shift = 0;
+  int shift = 0;
 
   void store_field_begin(const char *name) {
-    result.append(shift, ' ');
+    for (int i = 0; i < shift; i++) {
+      result += ' ';
+    }
     if (name && name[0]) {
       result += name;
       result += " = ";
@@ -154,7 +155,7 @@ class TlStorerToString {
   }
 
   void store_field_end() {
-    result += '\n';
+    result += "\n";
   }
 
   void store_long(int64 value) {
@@ -164,14 +165,14 @@ class TlStorerToString {
   void store_binary(Slice data) {
     static const char *hex = "0123456789ABCDEF";
 
-    result.append("{ ", 2);
+    result.append("{ ");
     for (auto c : data) {
       unsigned char byte = c;
       result += hex[byte >> 4];
       result += hex[byte & 15];
       result += ' ';
     }
-    result += '}';
+    result.append("}");
   }
 
  public:
@@ -210,14 +211,8 @@ class TlStorerToString {
   void store_field(const char *name, const string &value) {
     store_field_begin(name);
     result += '"';
-    result += value;
+    result.append(value.data(), value.size());
     result += '"';
-    store_field_end();
-  }
-
-  void store_field(const char *name, const SecureString &value) {
-    store_field_begin(name);
-    result.append("<secret>");
     store_field_end();
   }
 
@@ -225,12 +220,6 @@ class TlStorerToString {
   void store_field(const char *name, const T &value) {
     store_field_begin(name);
     result.append(value.data(), value.size());
-    store_field_end();
-  }
-
-  void store_bytes_field(const char *name, const SecureString &value) {
-    store_field_begin(name);
-    result.append("<secret>");
     store_field_end();
   }
 
@@ -276,14 +265,16 @@ class TlStorerToString {
   }
 
   void store_class_end() {
-    CHECK(shift >= 2);
     shift -= 2;
-    result.append(shift, ' ');
+    for (int i = 0; i < shift; i++) {
+      result += ' ';
+    }
     result += "}\n";
+    CHECK(shift >= 0);
   }
 
-  std::string move_as_str() {
-    return std::move(result);
+  std::string str() const {
+    return result;
   }
 };
 

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -116,7 +116,7 @@ auto invoke(F &&f,
 }
 
 template <class F, class... Args, std::size_t... S>
-auto call_tuple_impl(F &&func, std::tuple<Args...> &&tuple, IntSeq<S...>) {
+auto call_tuple_impl(F &func, std::tuple<Args...> &&tuple, IntSeq<S...>) {
   return func(std::forward<Args>(std::get<S>(tuple))...);
 }
 
@@ -151,7 +151,7 @@ class LogicAnd {
 };
 
 template <class F, class... Args>
-auto call_tuple(F &&func, std::tuple<Args...> &&tuple) {
+auto call_tuple(F &func, std::tuple<Args...> &&tuple) {
   return detail::call_tuple_impl(func, std::move(tuple), detail::IntRange<sizeof...(Args)>());
 }
 
